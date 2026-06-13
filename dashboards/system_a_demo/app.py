@@ -304,22 +304,22 @@ def generate_demo_data() -> dict:
 
 @st.cache_data
 def build_real_dashboard_data(
-    session_features: pd.DataFrame,
-    catalog: pd.DataFrame,
-    quality_scores: pd.DataFrame | None,
-    ablation: pd.DataFrame | None,
+    _session_features: pd.DataFrame,
+    _catalog: pd.DataFrame,
+    _quality_scores: pd.DataFrame | None,
+    _ablation: pd.DataFrame | None,
 ) -> dict:
-    items = catalog.copy()
+    items = _catalog.copy()
     items["genre"] = items["genres"].apply(primary_genre) if "genres" in items.columns else "Unknown"
     if "rating_count" in items.columns:
         items["popularity_pct"] = items["rating_count"].rank(pct=True)
     else:
-        item_pop = session_features["item_id"].value_counts(normalize=True).rename("popularity_pct")
+        item_pop = _session_features["item_id"].value_counts(normalize=True).rename("popularity_pct")
         items = items.merge(item_pop, left_on="item_id", right_index=True, how="left")
         items["popularity_pct"] = items["popularity_pct"].fillna(0.0)
 
-    if quality_scores is not None and "quality_score" in quality_scores.columns:
-        items = items.merge(quality_scores[["item_id", "quality_score"]], on="item_id", how="left")
+    if _quality_scores is not None and "quality_score" in _quality_scores.columns:
+        items = items.merge(_quality_scores[["item_id", "quality_score"]], on="item_id", how="left")
     elif "latent_quality" in items.columns:
         items["quality_score"] = items["latent_quality"]
     else:
@@ -330,15 +330,15 @@ def build_real_dashboard_data(
     items["chapter_count"] = items.get("chapter_count", pd.Series(0, index=items.index)).fillna(0).astype(int)
     items["title"] = items.get("title", pd.Series(items["item_id"], index=items.index))
 
-    session_with_genre = session_features.merge(items[["item_id", "genre"]], on="item_id", how="left")
+    session_with_genre = _session_features.merge(items[["item_id", "genre"]], on="item_id", how="left")
     active_days = (
-        pd.to_datetime(session_features["timestamp_start"]).max()
-        - pd.to_datetime(session_features["timestamp_start"]).min()
+        pd.to_datetime(_session_features["timestamp_start"]).max()
+        - pd.to_datetime(_session_features["timestamp_start"]).min()
     ).days + 1
     active_weeks = max(active_days / 7, 1)
 
     users = (
-        session_features.groupby("user_id")
+        _session_features.groupby("user_id")
         .agg(
             avg_velocity=("reading_velocity_wpm", "mean"),
             avg_completion=("final_completion_pct", "mean"),
@@ -364,11 +364,11 @@ def build_real_dashboard_data(
     return {
         "users": users,
         "items": items,
-        "ablation": normalize_ablation_columns(ablation) if ablation is not None else generate_demo_data()["ablation"],
+        "ablation": normalize_ablation_columns(_ablation) if _ablation is not None else generate_demo_data()["ablation"],
         "survival_curves": survival_curves,
         "chapters": chapters,
         "source": "Real processed artifacts",
-        "session_count": len(session_features),
+        "session_count": len(_session_features),
     }
 
 
