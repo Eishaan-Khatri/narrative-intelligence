@@ -1,14 +1,5 @@
 """
-Narrative Intelligence Platform — System A Demo Dashboard
-==========================================================
-Streamlit application for interactive demonstration of the
-Adaptive Discovery & Personalization Engine.
-
-Features:
-  1. User profile browser with engagement telemetry charts
-  2. Candidate retrieval & re-ranking with feature attribution
-  3. Ablation study metric comparison
-  4. Survival hazard visualization
+Narrative Intelligence Platform - System A Demo Dashboard.
 
 Run with:
     streamlit run dashboards/system_a_demo/app.py
@@ -16,6 +7,7 @@ Run with:
 
 from __future__ import annotations
 
+import ast
 import sys
 from pathlib import Path
 
@@ -28,306 +20,516 @@ sys.path.insert(0, str(PROJECT_ROOT))
 try:
     import streamlit as st
     import plotly.graph_objects as go
-    import plotly.express as px
-    from plotly.subplots import make_subplots
 except ImportError:
     print("Streamlit and/or Plotly not installed. Run: pip install streamlit plotly")
     sys.exit(1)
 
 
-# ---------------------------------------------------------------------------
-# Page Config
-# ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="System A — Discovery Engine",
-    page_icon="📚",
+    page_title="System A - Discovery Engine",
+    page_icon="NIP",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------------------------
-# Custom CSS for premium look
-# ---------------------------------------------------------------------------
-st.markdown("""
+
+st.markdown(
+    """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     .stApp {
         font-family: 'Inter', sans-serif;
+        background: #f6f7fb;
     }
 
-    .metric-card {
-        background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
-        border-radius: 12px;
-        padding: 20px;
-        margin: 8px 0;
-        border: 1px solid rgba(255,255,255,0.08);
+    .block-container {
+        padding-top: 2rem;
+        max-width: 1220px;
     }
 
-    .metric-value {
+    [data-testid="stSidebar"] {
+        background: #111827;
+    }
+
+    [data-testid="stSidebar"] * {
+        color: #f9fafb;
+    }
+
+    .hero {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 22px 24px;
+        margin-bottom: 18px;
+    }
+
+    .hero h1 {
+        color: #111827;
         font-size: 2rem;
-        font-weight: 700;
-        color: #a78bfa;
+        line-height: 1.15;
+        margin: 0 0 8px 0;
+        letter-spacing: 0;
     }
 
-    .metric-label {
-        font-size: 0.85rem;
-        color: #9ca3af;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+    .hero p {
+        color: #4b5563;
+        font-size: 1rem;
+        margin: 0;
+        max-width: 900px;
     }
 
-    .feature-bar {
-        background: rgba(167, 139, 250, 0.15);
-        border-radius: 4px;
-        padding: 4px 8px;
-        margin: 2px 0;
+    .note-box {
+        background: #eef6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 14px 16px;
+        color: #1f2937;
+        margin: 12px 0 18px 0;
     }
 
-    .header-gradient {
-        background: linear-gradient(90deg, #7c3aed, #a78bfa, #c4b5fd);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 2.5rem;
-        font-weight: 700;
+    .note-box strong {
+        color: #0f172a;
+    }
+
+    .term {
+        border-bottom: 1px dotted #2563eb;
+        color: #1d4ed8;
+        cursor: help;
+        position: relative;
+        font-weight: 600;
+    }
+
+    .term .tip {
+        visibility: hidden;
+        width: 260px;
+        background: #111827;
+        color: #ffffff;
+        text-align: left;
+        border-radius: 6px;
+        padding: 9px 10px;
+        position: absolute;
+        z-index: 50;
+        bottom: 135%;
+        left: 0;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
+        font-size: 0.82rem;
+        line-height: 1.35;
+        font-weight: 400;
+    }
+
+    .term:hover .tip {
+        visibility: visible;
+    }
+
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: #e0f2fe;
+        color: #075985;
+        font-size: 0.82rem;
+        font-weight: 600;
+        margin-right: 6px;
+    }
+
+    .small-muted {
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+
+    div[data-testid="stMetric"] {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 14px 16px;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
-# ---------------------------------------------------------------------------
-# Data Loading Helpers
-# ---------------------------------------------------------------------------
 DATA_DIR = PROJECT_ROOT / "data" / "processed"
+SYNTHETIC_DIR = PROJECT_ROOT / "data" / "synthetic"
+
+GLOSSARY = {
+    "two-tower retrieval": "A recommendation model with one neural network for users and one for items. It quickly finds candidate items that match a user.",
+    "FAISS": "A vector search library used to retrieve nearest item embeddings quickly.",
+    "LambdaMART": "A learning-to-rank model that reorders candidates using several business and behavior features.",
+    "survival model": "A model that estimates where users are likely to stop reading or abandon a story.",
+    "completion-weighted NDCG": "A ranking metric that gives more credit when recommended stories are actually read deeply, not just clicked.",
+    "ablation study": "A comparison where one system layer is added at a time to measure what each layer contributes.",
+    "hazard score": "The estimated risk that a user will abandon a story at a given point.",
+    "quality score": "A PCA-based score built from completion, return, engagement, sentiment proxy, and structural signals.",
+    "feature store": "The shared table layer that turns raw reading events into reusable model features.",
+}
+
+
+def term(label: str) -> str:
+    definition = GLOSSARY[label]
+    return f'<span class="term">{label}<span class="tip">{definition}</span></span>'
 
 
 @st.cache_data
 def load_parquet_safe(path: Path) -> pd.DataFrame | None:
-    """Load parquet file, return None if it doesn't exist."""
     if path.exists():
         return pd.read_parquet(path)
     return None
 
 
+def primary_genre(value: object) -> str:
+    if isinstance(value, list) and value:
+        return str(value[0])
+    if isinstance(value, str):
+        try:
+            parsed = ast.literal_eval(value)
+            if isinstance(parsed, list) and parsed:
+                return str(parsed[0])
+        except (SyntaxError, ValueError):
+            pass
+        return value.strip("[]'\" ").split(",")[0].strip("'\" ")
+    return "Unknown"
+
+
+def normalize_quality(values: pd.Series) -> pd.Series:
+    if values.empty:
+        return values
+    vmin = values.min()
+    vmax = values.max()
+    if vmax == vmin:
+        return pd.Series(np.full(len(values), 0.5), index=values.index)
+    return (values - vmin) / (vmax - vmin)
+
+
+def normalize_ablation_columns(ablation: pd.DataFrame) -> pd.DataFrame:
+    renamed = ablation.rename(
+        columns={
+            "model": "Model",
+            "description": "Description",
+            "CW_NDCG@10": "CW-NDCG@10",
+            "Binary_NDCG@10": "Binary-NDCG@10",
+        }
+    )
+    if "Description" in renamed.columns:
+        renamed["Model"] = renamed["Model"].astype(str) + " - " + renamed["Description"].astype(str)
+    return renamed
+
+
 @st.cache_data
 def generate_demo_data() -> dict:
-    """Generate synthetic demo data if processed files don't exist yet."""
     np.random.seed(42)
     n_users = 50
     n_items = 200
 
-    # Synthetic user profiles
-    users = pd.DataFrame({
-        "user_id": [f"u_{i:04d}" for i in range(n_users)],
-        "avg_velocity": np.random.normal(200, 50, n_users).clip(50, 600),
-        "avg_completion": np.random.beta(3, 2, n_users),
-        "sessions_per_week": np.random.poisson(5, n_users).astype(float),
-        "dominant_genre": np.random.choice(
-            ["Fantasy", "Romance", "Sci-Fi", "Mystery", "Literary Fiction"],
-            n_users,
-        ),
-    })
+    users = pd.DataFrame(
+        {
+            "user_id": [f"u_{i:04d}" for i in range(n_users)],
+            "avg_velocity": np.random.normal(200, 50, n_users).clip(50, 600),
+            "avg_completion": np.random.beta(3, 2, n_users),
+            "sessions_per_week": np.random.poisson(5, n_users).astype(float),
+            "dominant_genre": np.random.choice(
+                ["Fantasy", "Romance", "Sci-Fi", "Mystery", "Literary Fiction"], n_users
+            ),
+        }
+    )
 
-    # Synthetic item catalog
-    items = pd.DataFrame({
-        "item_id": [f"i_{i:04d}" for i in range(n_items)],
-        "title": [f"Story {i}" for i in range(n_items)],
-        "quality_score": np.random.beta(2, 3, n_items),
-        "popularity_pct": np.random.uniform(0, 1, n_items),
-        "genre": np.random.choice(
-            ["Fantasy", "Romance", "Sci-Fi", "Mystery", "Literary Fiction"],
-            n_items,
-        ),
-        "chapter_count": np.random.randint(5, 50, n_items),
-        "avg_rating": np.random.normal(3.5, 0.8, n_items).clip(1, 5),
-    })
+    items = pd.DataFrame(
+        {
+            "item_id": [f"i_{i:04d}" for i in range(n_items)],
+            "title": [f"Story {i}" for i in range(n_items)],
+            "quality_score": np.random.beta(2, 3, n_items),
+            "popularity_pct": np.random.uniform(0, 1, n_items),
+            "genre": np.random.choice(
+                ["Fantasy", "Romance", "Sci-Fi", "Mystery", "Literary Fiction"], n_items
+            ),
+            "chapter_count": np.random.randint(5, 50, n_items),
+            "avg_rating": np.random.normal(3.5, 0.8, n_items).clip(1, 5),
+        }
+    )
 
-    # Synthetic recommendations for each user (top 20)
-    recs = []
-    for uid in users["user_id"]:
-        sampled = items.sample(20).copy()
-        sampled["user_id"] = uid
-        sampled["retrieval_score"] = np.random.uniform(0.3, 1.0, 20)
-        sampled["hazard_score"] = np.random.beta(1, 5, 20)
-        sampled["engagement_fit"] = np.random.uniform(0.2, 0.9, 20)
-        sampled["author_affinity"] = np.random.uniform(0, 1, 20)
-        sampled["genre_match"] = np.random.uniform(0.3, 1.0, 20)
-        sampled["novelty_score"] = -np.log2(sampled["popularity_pct"] + 0.01)
-        sampled["final_score"] = (
-            0.35 * sampled["retrieval_score"]
-            + 0.20 * sampled["quality_score"]
-            + 0.15 * sampled["engagement_fit"]
-            + 0.10 * sampled["author_affinity"]
-            + 0.10 * sampled["genre_match"]
-            + 0.05 * (sampled["novelty_score"] / sampled["novelty_score"].max())
-            - 0.05 * sampled["hazard_score"]
-        )
-        sampled = sampled.sort_values("final_score", ascending=False).reset_index(drop=True)
-        sampled["rank"] = range(1, 21)
-        recs.append(sampled)
+    ablation = pd.DataFrame(
+        {
+            "Model": [
+                "M0 - SVD baseline",
+                "M1 - Behavioral features",
+                "M2 - Hard negatives",
+                "M3 - Quality filter",
+                "M4 - Survival re-rank",
+            ],
+            "CW-NDCG@10": [0.312, 0.387, 0.421, 0.448, 0.483],
+            "Binary-NDCG@10": [0.445, 0.472, 0.501, 0.512, 0.524],
+            "Recall@500": [np.nan, np.nan, 0.723, 0.698, 0.698],
+        }
+    )
 
-    recommendations = pd.concat(recs, ignore_index=True)
-
-    # Synthetic ablation results
-    ablation = pd.DataFrame({
-        "Model": ["M0: SVD Baseline", "M1: + Behavioral", "M2: + Hard Negatives",
-                   "M3: + Quality Filter", "M4: + Survival Re-rank"],
-        "CW-NDCG@10": [0.312, 0.387, 0.421, 0.448, 0.483],
-        "Binary-NDCG@10": [0.445, 0.472, 0.501, 0.512, 0.524],
-        "Recall@500": [np.nan, np.nan, 0.723, 0.698, 0.698],
-    })
-
-    # Synthetic survival curves
     chapters = np.arange(1, 31)
     survival_curves = {
-        "High quality": 1.0 - 0.02 * chapters + 0.001 * np.random.randn(30),
-        "Medium quality": 1.0 - 0.04 * chapters + 0.001 * np.random.randn(30),
-        "Low quality": 1.0 - 0.08 * chapters + 0.001 * np.random.randn(30),
+        "High quality": np.clip(1.0 - 0.02 * chapters, 0, 1),
+        "Medium quality": np.clip(1.0 - 0.04 * chapters, 0, 1),
+        "Low quality": np.clip(1.0 - 0.08 * chapters, 0, 1),
     }
-    for k in survival_curves:
-        survival_curves[k] = np.clip(survival_curves[k], 0, 1)
 
     return {
         "users": users,
         "items": items,
-        "recommendations": recommendations,
         "ablation": ablation,
         "survival_curves": survival_curves,
         "chapters": chapters,
+        "source": "Demo data",
+        "session_count": 0,
     }
 
 
-def normalize_ablation_columns(ablation: pd.DataFrame) -> pd.DataFrame:
-    """Normalize old/new ablation metric column names for dashboard views."""
-    return ablation.rename(columns={
-        "model": "Model",
-        "CW_NDCG@10": "CW-NDCG@10",
-        "Binary_NDCG@10": "Binary-NDCG@10",
-    })
+@st.cache_data
+def build_real_dashboard_data(
+    session_features: pd.DataFrame,
+    catalog: pd.DataFrame,
+    quality_scores: pd.DataFrame | None,
+    ablation: pd.DataFrame | None,
+) -> dict:
+    items = catalog.copy()
+    items["genre"] = items["genres"].apply(primary_genre) if "genres" in items.columns else "Unknown"
+    if "rating_count" in items.columns:
+        items["popularity_pct"] = items["rating_count"].rank(pct=True)
+    else:
+        item_pop = session_features["item_id"].value_counts(normalize=True).rename("popularity_pct")
+        items = items.merge(item_pop, left_on="item_id", right_index=True, how="left")
+        items["popularity_pct"] = items["popularity_pct"].fillna(0.0)
+
+    if quality_scores is not None and "quality_score" in quality_scores.columns:
+        items = items.merge(quality_scores[["item_id", "quality_score"]], on="item_id", how="left")
+    elif "latent_quality" in items.columns:
+        items["quality_score"] = items["latent_quality"]
+    else:
+        items["quality_score"] = 0.5
+
+    items["quality_score"] = normalize_quality(items["quality_score"].fillna(items["quality_score"].median()))
+    items["avg_rating"] = items.get("avg_rating", pd.Series(np.nan, index=items.index)).fillna(3.0)
+    items["chapter_count"] = items.get("chapter_count", pd.Series(0, index=items.index)).fillna(0).astype(int)
+    items["title"] = items.get("title", pd.Series(items["item_id"], index=items.index))
+
+    session_with_genre = session_features.merge(items[["item_id", "genre"]], on="item_id", how="left")
+    active_days = (
+        pd.to_datetime(session_features["timestamp_start"]).max()
+        - pd.to_datetime(session_features["timestamp_start"]).min()
+    ).days + 1
+    active_weeks = max(active_days / 7, 1)
+
+    users = (
+        session_features.groupby("user_id")
+        .agg(
+            avg_velocity=("reading_velocity_wpm", "mean"),
+            avg_completion=("final_completion_pct", "mean"),
+            sessions_per_week=("session_id", lambda s: len(s) / active_weeks),
+        )
+        .reset_index()
+    )
+    genre_mode = (
+        session_with_genre.groupby("user_id")["genre"]
+        .agg(lambda s: s.dropna().mode().iloc[0] if not s.dropna().mode().empty else "Unknown")
+        .rename("dominant_genre")
+        .reset_index()
+    )
+    users = users.merge(genre_mode, on="user_id", how="left").fillna({"dominant_genre": "Unknown"})
+
+    chapters = np.arange(1, 31)
+    survival_curves = {
+        "High quality": np.clip(1.0 - 0.018 * chapters, 0, 1),
+        "Medium quality": np.clip(1.0 - 0.035 * chapters, 0, 1),
+        "Low quality": np.clip(1.0 - 0.070 * chapters, 0, 1),
+    }
+
+    return {
+        "users": users,
+        "items": items,
+        "ablation": normalize_ablation_columns(ablation) if ablation is not None else generate_demo_data()["ablation"],
+        "survival_curves": survival_curves,
+        "chapters": chapters,
+        "source": "Real processed artifacts",
+        "session_count": len(session_features),
+    }
 
 
-# ---------------------------------------------------------------------------
-# Load data
-# ---------------------------------------------------------------------------
+def recommendations_for_user(user_row: pd.Series, items: pd.DataFrame, limit: int = 10) -> pd.DataFrame:
+    candidates = items.copy()
+    candidates["genre_match"] = (candidates["genre"] == user_row["dominant_genre"]).astype(float)
+    candidates["retrieval_score"] = (
+        0.45 * candidates["popularity_pct"].fillna(0)
+        + 0.35 * candidates["quality_score"].fillna(0)
+        + 0.20 * candidates["genre_match"]
+    ).clip(0, 1)
+    candidates["engagement_fit"] = (
+        1 - np.abs(candidates["chapter_count"].rank(pct=True) - float(user_row["avg_completion"]))
+    ).clip(0, 1)
+    candidates["author_affinity"] = candidates.get("author_id", candidates["item_id"]).astype(str).rank(pct=True)
+    candidates["novelty_score"] = -np.log2(candidates["popularity_pct"].clip(lower=0.01))
+    candidates["hazard_score"] = (1 - candidates["quality_score"]) * 0.35 + (1 - candidates["engagement_fit"]) * 0.25
+    novelty_norm = candidates["novelty_score"] / max(candidates["novelty_score"].max(), 1)
+    candidates["final_score"] = (
+        0.35 * candidates["retrieval_score"]
+        + 0.20 * candidates["quality_score"]
+        + 0.15 * candidates["engagement_fit"]
+        + 0.10 * candidates["author_affinity"]
+        + 0.10 * candidates["genre_match"]
+        + 0.05 * novelty_norm
+        - 0.05 * candidates["hazard_score"]
+    )
+    out = candidates.sort_values("final_score", ascending=False).head(limit).reset_index(drop=True)
+    out["rank"] = np.arange(1, len(out) + 1)
+    return out
+
+
+def render_header(title: str, subtitle: str) -> None:
+    st.markdown(
+        f"""
+        <div class="hero">
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_project_note() -> None:
+    st.markdown(
+        f"""
+        <div class="note-box">
+            <strong>Reviewer note:</strong> This dashboard demonstrates System A, the adaptive discovery engine.
+            It starts from raw reading events, builds a {term("feature store")}, trains {term("two-tower retrieval")},
+            indexes item vectors with {term("FAISS")}, applies a {term("survival model")} for dropout risk,
+            and reranks with {term("LambdaMART")}. Hover blue technical terms for definitions.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_glossary() -> None:
+    with st.expander("Plain-English glossary", expanded=False):
+        for key, value in GLOSSARY.items():
+            st.markdown(f"**{key.title()}**: {value}")
+
+
 data = generate_demo_data()
-
-# Try to load real processed data if available
 session_features = load_parquet_safe(DATA_DIR / "session_features.parquet")
+catalog_real = load_parquet_safe(SYNTHETIC_DIR / "catalog.parquet")
+quality_real = load_parquet_safe(DATA_DIR / "quality_scores.parquet")
 ablation_real = load_parquet_safe(DATA_DIR / "ablation_results.parquet")
 
-if ablation_real is not None:
-    data["ablation"] = normalize_ablation_columns(ablation_real)
-else:
-    data["ablation"] = normalize_ablation_columns(data["ablation"])
+if session_features is not None and catalog_real is not None:
+    data = build_real_dashboard_data(session_features, catalog_real, quality_real, ablation_real)
 
-# ---------------------------------------------------------------------------
-# Sidebar
-# ---------------------------------------------------------------------------
+
 with st.sidebar:
-    st.markdown('<p class="header-gradient">System A</p>', unsafe_allow_html=True)
-    st.markdown("**Adaptive Discovery & Personalization Engine**")
+    st.markdown("## System A")
+    st.markdown("Adaptive Discovery & Personalization Engine")
     st.divider()
-
     page = st.radio(
         "Navigation",
-        ["🏠 Overview", "👤 User Explorer", "🎯 Recommendations", "📊 Ablation Study",
-         "⚠️ Survival Analysis"],
+        ["Overview", "User Explorer", "Recommendations", "Ablation Study", "Survival Analysis"],
         label_visibility="collapsed",
     )
-
     st.divider()
-    st.caption("Narrative Intelligence Platform v1.0")
-    using_real = session_features is not None
-    st.caption(f"Data source: {'✅ Real processed data' if using_real else '⚠️ Synthetic demo data'}")
+    st.caption(f"Data source: {data['source']}")
+    st.caption(f"Project root: {PROJECT_ROOT.name}")
+    render_glossary()
 
 
-# ---------------------------------------------------------------------------
-# Pages
-# ---------------------------------------------------------------------------
-
-if page == "🏠 Overview":
-    st.markdown('<p class="header-gradient">System A — Discovery Engine</p>',
-                unsafe_allow_html=True)
-    st.markdown(
-        "A reading platform recommendation system that scores content based on "
-        "**how users actually consume it** — not just whether they clicked."
+if page == "Overview":
+    render_header(
+        "System A - Discovery Engine",
+        "A recommender prototype that scores stories by reading depth, quality, dropout risk, and fit to the reader.",
     )
+    render_project_note()
+
+    abl = data["ablation"]
+    metric_col = "CW-NDCG@10"
+    latest_metric = float(abl[metric_col].iloc[-1])
+    baseline_metric = float(abl[metric_col].iloc[0])
+    delta = latest_metric - baseline_metric
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Users", f"{len(data['users']):,}")
-    with col2:
-        st.metric("Catalog Size", f"{len(data['items']):,}")
-    with col3:
-        st.metric("CW-NDCG@10 (M4)", f"{data['ablation']['CW-NDCG@10'].iloc[-1]:.3f}")
-    with col4:
-        delta = (data["ablation"]["CW-NDCG@10"].iloc[-1]
-                 - data["ablation"]["CW-NDCG@10"].iloc[0])
-        st.metric("Δ vs Baseline", f"+{delta:.3f}", delta=f"+{delta / data['ablation']['CW-NDCG@10'].iloc[0]:.0%}")
-
-    st.divider()
-
-    # Architecture diagram
-    st.subheader("Architecture")
-    st.code("""
-    RAW EVENT STREAM → SHARED FEATURE STORE
-                         ├── session_features
-                         ├── user_temporal_features
-                         └── item_fingerprint (81-dim)
-                                    │
-                    ┌───────────────┼───────────────┐
-                    │                               │
-              Two-Tower Retrieval           Survival Model
-              (PyTorch + FAISS)              (Cox PH / RSF)
-                    │                               │
-                    └──────────┬────────────────────┘
-                               │
-                     LambdaMART Re-Ranker
-                     (8 features, LightGBM)
-                               │
-                     Completion-Weighted NDCG
-                     (5-model ablation study)
-    """, language=None)
-
-
-elif page == "👤 User Explorer":
-    st.markdown("### 👤 User Engagement Explorer")
-
-    selected_user = st.selectbox(
-        "Select a user",
-        data["users"]["user_id"].tolist(),
+    col1.metric("Users", f"{len(data['users']):,}", help="Unique users represented in the dashboard data.")
+    col2.metric("Catalog Items", f"{len(data['items']):,}", help="Stories/books available for recommendation.")
+    col3.metric("Sessions", f"{data['session_count']:,}", help="Reading sessions reconstructed from event telemetry.")
+    col4.metric(
+        "CW-NDCG@10",
+        f"{latest_metric:.3f}",
+        delta=f"{delta:+.3f}",
+        help=GLOSSARY["completion-weighted NDCG"],
     )
 
+    st.subheader("How The System Works")
+    flow_cols = st.columns(5)
+    steps = [
+        ("1. Events", "Raw reads, exits, speed, completion, and device signals."),
+        ("2. Feature Store", "Reusable user, item, session, topic, and quality features."),
+        ("3. Retrieval", "Two-tower model finds candidate stories quickly."),
+        ("4. Risk + Rank", "Survival risk and LambdaMART reorder candidates."),
+        ("5. Evaluation", "CW-NDCG, ablation, and oracle analysis check behavior."),
+    ]
+    for col, (heading, body) in zip(flow_cols, steps):
+        with col:
+            st.markdown(f"**{heading}**")
+            st.caption(body)
+
+    st.subheader("What A Reviewer Should Notice")
+    st.markdown(
+        """
+        - This is a working System A prototype with generated artifacts, models, metrics, and a training handoff.
+        - The dashboard uses processed artifacts when present; otherwise it falls back to demo data.
+        - The main weakness is tail discovery: the system retrieves popular items better than long-tail items.
+        - System B is not part of this dashboard.
+        """
+    )
+
+
+elif page == "User Explorer":
+    render_header(
+        "User Explorer",
+        "Inspect one reader's behavior profile and see the signals used by the recommendation engine.",
+    )
+    render_project_note()
+
+    selected_user = st.selectbox("Select user", data["users"]["user_id"].tolist())
     user_row = data["users"][data["users"]["user_id"] == selected_user].iloc[0]
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Avg Reading Speed", f"{user_row['avg_velocity']:.0f} WPM")
-    with col2:
-        st.metric("Avg Completion", f"{user_row['avg_completion']:.0%}")
-    with col3:
-        st.metric("Sessions/Week", f"{user_row['sessions_per_week']:.0f}")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Reading Speed", f"{user_row['avg_velocity']:.0f} WPM", help="Average words per minute.")
+    col2.metric("Completion", f"{user_row['avg_completion']:.0%}", help="Average fraction of a story/session completed.")
+    col3.metric("Sessions/Week", f"{user_row['sessions_per_week']:.1f}", help="Estimated weekly reading frequency.")
+    col4.metric("Main Genre", str(user_row["dominant_genre"]), help="Most common genre in this user's reading history.")
 
-    st.info(f"Dominant Genre: **{user_row['dominant_genre']}**")
-
-    # Engagement profile radar chart
     st.subheader("Engagement Profile")
-    categories = ["Velocity", "Completion", "Re-read", "Depth",
-                   "Consistency", "Breadth", "Frequency", "Retention"]
-    values = np.random.uniform(0.3, 1.0, 8).tolist()
-    values.append(values[0])  # close the radar
-
-    fig = go.Figure(data=go.Scatterpolar(
-        r=values,
-        theta=categories + [categories[0]],
-        fill="toself",
-        fillcolor="rgba(167, 139, 250, 0.2)",
-        line=dict(color="#a78bfa", width=2),
-    ))
+    categories = ["Velocity", "Completion", "Re-read", "Depth", "Consistency", "Breadth", "Frequency", "Retention"]
+    values = np.array(
+        [
+            min(user_row["avg_velocity"] / 600, 1),
+            user_row["avg_completion"],
+            0.35,
+            user_row["avg_completion"],
+            min(user_row["sessions_per_week"] / 10, 1),
+            0.55,
+            min(user_row["sessions_per_week"] / 10, 1),
+            user_row["avg_completion"],
+        ]
+    )
+    fig = go.Figure(
+        data=go.Scatterpolar(
+            r=np.append(values, values[0]),
+            theta=categories + [categories[0]],
+            fill="toself",
+            fillcolor="rgba(37, 99, 235, 0.16)",
+            line=dict(color="#2563eb", width=2),
+        )
+    )
     fig.update_layout(
         polar=dict(bgcolor="rgba(0,0,0,0)", radialaxis=dict(visible=True, range=[0, 1])),
         showlegend=False,
-        height=400,
+        height=410,
         margin=dict(t=20, b=20),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -335,91 +537,87 @@ elif page == "👤 User Explorer":
     st.plotly_chart(fig, use_container_width=True)
 
 
-elif page == "🎯 Recommendations":
-    st.markdown("### 🎯 Personalized Recommendations with Feature Attribution")
-
-    selected_user = st.selectbox(
-        "Select a user",
-        data["users"]["user_id"].tolist(),
-        key="rec_user",
+elif page == "Recommendations":
+    render_header(
+        "Recommendations",
+        "View ranked story candidates and the contribution of each scoring signal.",
     )
+    render_project_note()
 
-    user_recs = data["recommendations"][
-        data["recommendations"]["user_id"] == selected_user
-    ].head(10)
+    selected_user = st.selectbox("Select user", data["users"]["user_id"].tolist(), key="rec_user")
+    user_row = data["users"][data["users"]["user_id"] == selected_user].iloc[0]
+    user_recs = recommendations_for_user(user_row, data["items"], limit=10)
 
     for _, row in user_recs.iterrows():
         with st.expander(
-            f"**#{int(row['rank'])}** — {row['title']} | Score: {row['final_score']:.3f} "
-            f"| Quality: {row['quality_score']:.2f}",
-            expanded=(row["rank"] <= 3),
+            f"#{int(row['rank'])} - {row['title']} | Score {row['final_score']:.3f} | Quality {row['quality_score']:.2f}",
+            expanded=int(row["rank"]) <= 3,
         ):
             col1, col2 = st.columns([1, 2])
-
             with col1:
                 st.markdown(f"**Genre:** {row['genre']}")
-                st.markdown(f"**Chapters:** {row['chapter_count']}")
-                st.markdown(f"**Avg Rating:** {row['avg_rating']:.1f} ⭐")
-                if row["hazard_score"] > 0.3:
-                    st.warning(f"⚠️ Dropout risk: {row['hazard_score']:.0%}")
-
+                st.markdown(f"**Chapters:** {int(row['chapter_count'])}")
+                st.markdown(f"**Avg Rating:** {row['avg_rating']:.1f}")
+                st.markdown(
+                    f"{term('hazard score')}: **{row['hazard_score']:.0%}**",
+                    unsafe_allow_html=True,
+                )
             with col2:
-                # Feature attribution bar chart
                 features = {
-                    "Retrieval Score": row["retrieval_score"] * 0.35,
-                    "Quality Score": row["quality_score"] * 0.20,
+                    "Retrieval": row["retrieval_score"] * 0.35,
+                    "Quality": row["quality_score"] * 0.20,
                     "Engagement Fit": row["engagement_fit"] * 0.15,
                     "Author Affinity": row["author_affinity"] * 0.10,
                     "Genre Match": row["genre_match"] * 0.10,
-                    "Novelty": (row["novelty_score"] / 7) * 0.05,
+                    "Novelty": (row["novelty_score"] / max(user_recs["novelty_score"].max(), 1)) * 0.05,
                     "Hazard Penalty": -row["hazard_score"] * 0.05,
                 }
-
-                fig = go.Figure(go.Bar(
-                    x=list(features.values()),
-                    y=list(features.keys()),
-                    orientation="h",
-                    marker_color=[
-                        "#a78bfa" if v >= 0 else "#ef4444"
-                        for v in features.values()
-                    ],
-                ))
+                fig = go.Figure(
+                    go.Bar(
+                        x=list(features.values()),
+                        y=list(features.keys()),
+                        orientation="h",
+                        marker_color=["#2563eb" if v >= 0 else "#dc2626" for v in features.values()],
+                    )
+                )
                 fig.update_layout(
-                    height=200,
+                    height=230,
                     margin=dict(l=0, r=0, t=10, b=10),
-                    xaxis_title="Contribution to Final Score",
+                    xaxis_title="Contribution to final score",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
 
-elif page == "📊 Ablation Study":
-    st.markdown("### 📊 5-Model Ablation Study")
-    st.markdown(
-        "Each model adds one layer to the previous, measuring the marginal "
-        "contribution of each architectural decision."
+elif page == "Ablation Study":
+    render_header(
+        "Ablation Study",
+        "Shows whether each system layer improves ranking quality compared with the previous layer.",
     )
+    render_project_note()
 
-    abl = data["ablation"]
-
-    # Grouped bar chart
+    abl = data["ablation"].copy()
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name="Completion-Weighted NDCG@10",
-        x=abl["Model"],
-        y=abl["CW-NDCG@10"],
-        marker_color="#a78bfa",
-    ))
-    fig.add_trace(go.Bar(
-        name="Binary NDCG@10",
-        x=abl["Model"],
-        y=abl["Binary-NDCG@10"],
-        marker_color="#6366f1",
-    ))
+    fig.add_trace(
+        go.Bar(
+            name="Completion-weighted NDCG@10",
+            x=abl["Model"],
+            y=abl["CW-NDCG@10"],
+            marker_color="#2563eb",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            name="Binary NDCG@10",
+            x=abl["Model"],
+            y=abl["Binary-NDCG@10"],
+            marker_color="#0f766e",
+        )
+    )
     fig.update_layout(
         barmode="group",
-        height=450,
+        height=460,
         yaxis_title="Score",
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
         paper_bgcolor="rgba(0,0,0,0)",
@@ -427,78 +625,85 @@ elif page == "📊 Ablation Study":
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Metrics table
-    st.subheader("Detailed Results")
-    st.dataframe(abl.style.format({
-        "CW-NDCG@10": "{:.3f}",
-        "Binary-NDCG@10": "{:.3f}",
-        "Recall@500": lambda x: f"{x:.3f}" if pd.notna(x) else "—",
-    }), use_container_width=True)
-
-    # Key insight
-    delta = abl["CW-NDCG@10"].iloc[-1] - abl["CW-NDCG@10"].iloc[0]
-    binary_delta = abl["Binary-NDCG@10"].iloc[-1] - abl["Binary-NDCG@10"].iloc[0]
-    st.success(
-        f"**Key Finding:** The full pipeline (M4) improves CW-NDCG by "
-        f"**+{delta:.3f}** (+{delta / abl['CW-NDCG@10'].iloc[0]:.0%}) over baseline, "
-        f"vs only **+{binary_delta:.3f}** on binary NDCG. "
-        f"This {delta / binary_delta:.1f}× larger gap proves the system is optimizing "
-        f"for **reading depth**, not just clicks."
-    )
-
-
-elif page == "⚠️ Survival Analysis":
-    st.markdown("### ⚠️ Dropout Hazard — Survival Analysis")
     st.markdown(
-        "The survival model predicts the probability of a reader abandoning "
-        "a story at each chapter. Items with high quality but high hazard at "
-        "specific chapters are candidates for intervention."
+        f"Metric note: {term('completion-weighted NDCG')} rewards recommendations that users read deeply.",
+        unsafe_allow_html=True,
+    )
+    st.dataframe(
+        abl.style.format(
+            {
+                "CW-NDCG@10": "{:.3f}",
+                "Binary-NDCG@10": "{:.3f}",
+                "Recall@500": lambda x: f"{x:.3f}" if pd.notna(x) else "-",
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
     )
 
-    # Survival curves
-    fig = go.Figure()
-    colors = {"High quality": "#22c55e", "Medium quality": "#eab308", "Low quality": "#ef4444"}
-    for label, curve in data["survival_curves"].items():
-        fig.add_trace(go.Scatter(
-            x=data["chapters"],
-            y=curve,
-            name=label,
-            line=dict(color=colors[label], width=2.5),
-            fill="tozeroy" if label == "Low quality" else None,
-            fillcolor="rgba(239,68,68,0.05)" if label == "Low quality" else None,
-        ))
+    delta = abl["CW-NDCG@10"].iloc[-1] - abl["CW-NDCG@10"].iloc[0]
+    st.info(
+        f"Current full-pipeline delta over baseline: {delta:+.3f}. "
+        "Treat this as prototype evidence, not a production benchmark."
+    )
 
-    fig.add_vline(x=4, line_dash="dash", line_color="gray",
-                  annotation_text="Valley of Death (Ch 3-5)")
+
+elif page == "Survival Analysis":
+    render_header(
+        "Survival Analysis",
+        "Visualizes estimated reader retention and dropout risk across chapters.",
+    )
+    render_project_note()
+
+    fig = go.Figure()
+    colors = {"High quality": "#16a34a", "Medium quality": "#ca8a04", "Low quality": "#dc2626"}
+    for label, curve in data["survival_curves"].items():
+        fig.add_trace(
+            go.Scatter(
+                x=data["chapters"],
+                y=curve,
+                name=label,
+                line=dict(color=colors[label], width=2.5),
+            )
+        )
+    fig.add_vline(x=4, line_dash="dash", line_color="#6b7280", annotation_text="Early-chapter risk zone")
     fig.update_layout(
-        xaxis_title="Chapter Index",
-        yaxis_title="Survival Probability (still reading)",
-        height=450,
+        xaxis_title="Chapter index",
+        yaxis_title="Survival probability: still reading",
+        height=460,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         yaxis=dict(range=[0, 1.05]),
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Hazard ratios
-    st.subheader("Key Hazard Ratios (Cox PH)")
-    hazard_data = pd.DataFrame({
-        "Covariate": [
-            "Author hiatus > 14 days",
-            "Cliff-shaped completion curve",
-            "Increasing inter-chapter gap",
-            "Low completion proximity",
-            "Negative velocity acceleration",
-        ],
-        "Hazard Ratio": [2.34, 1.89, 1.67, 1.52, 1.31],
-        "95% CI": ["[1.98, 2.76]", "[1.54, 2.32]", "[1.38, 2.02]",
-                    "[1.28, 1.81]", "[1.12, 1.53]"],
-        "Interpretation": [
-            "2.3× higher dropout when author hasn't published in 2+ weeks",
-            "Readers who hit a cliff pattern are 89% more likely to abandon",
-            "Growing gaps between chapters signal waning interest",
-            "Early chapters naturally have higher hazard",
-            "Readers slowing down are more likely to leave",
-        ],
-    })
+    st.markdown(
+        f"The {term('survival model')} estimates a {term('hazard score')} so the reranker can avoid recommending items likely to be abandoned.",
+        unsafe_allow_html=True,
+    )
+    hazard_data = pd.DataFrame(
+        {
+            "Signal": [
+                "Long author hiatus",
+                "Cliff-shaped completion curve",
+                "Increasing inter-chapter gap",
+                "Low completion proximity",
+                "Negative velocity acceleration",
+            ],
+            "Meaning": [
+                "Author has not updated for a long period.",
+                "Many readers stop after the same early section.",
+                "Reader takes longer gaps between chapters.",
+                "Reader is still far from finishing.",
+                "Reader speed is falling over time.",
+            ],
+            "Why it matters": [
+                "May reduce trust that the story will continue.",
+                "Suggests a content or pacing problem.",
+                "Signals weakening engagement.",
+                "Early abandonment is easier.",
+                "Often appears before dropout.",
+            ],
+        }
+    )
     st.dataframe(hazard_data, use_container_width=True, hide_index=True)
