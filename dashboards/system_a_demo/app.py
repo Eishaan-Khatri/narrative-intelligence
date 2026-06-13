@@ -295,6 +295,16 @@ def generate_demo_data() -> dict:
         "users": users,
         "items": items,
         "ablation": ablation,
+        "ranking_metrics": pd.DataFrame(
+            {
+                "k": [10],
+                "CW_NDCG": [0.483],
+                "Binary_NDCG": [0.524],
+                "delta": [-0.041],
+            }
+        ),
+        "overall_recall_500": np.nan,
+        "tail_recall_500": np.nan,
         "survival_curves": survival_curves,
         "chapters": chapters,
         "source": "Demo data",
@@ -308,6 +318,8 @@ def build_real_dashboard_data(
     _catalog: pd.DataFrame,
     _quality_scores: pd.DataFrame | None,
     _ablation: pd.DataFrame | None,
+    _ranking_metrics: pd.DataFrame | None,
+    _oracle_analysis: pd.DataFrame | None,
 ) -> dict:
     items = _catalog.copy()
     items["genre"] = items["genres"].apply(primary_genre) if "genres" in items.columns else "Unknown"
@@ -361,10 +373,25 @@ def build_real_dashboard_data(
         "Low quality": np.clip(1.0 - 0.070 * chapters, 0, 1),
     }
 
+    ranking_metrics = _ranking_metrics if _ranking_metrics is not None else generate_demo_data()["ranking_metrics"]
+    overall_recall_500 = np.nan
+    tail_recall_500 = np.nan
+    if _oracle_analysis is not None and not _oracle_analysis.empty:
+        if "overall_recall_500" in _oracle_analysis.columns:
+            overall_values = _oracle_analysis["overall_recall_500"].dropna()
+            if not overall_values.empty:
+                overall_recall_500 = float(overall_values.iloc[0])
+        tail_rows = _oracle_analysis[_oracle_analysis.get("quartile").eq("Q1 (tail)")]
+        if not tail_rows.empty and "recall" in tail_rows.columns:
+            tail_recall_500 = float(tail_rows["recall"].iloc[0])
+
     return {
         "users": users,
         "items": items,
         "ablation": normalize_ablation_columns(_ablation) if _ablation is not None else generate_demo_data()["ablation"],
+        "ranking_metrics": ranking_metrics,
+        "overall_recall_500": overall_recall_500,
+        "tail_recall_500": tail_recall_500,
         "survival_curves": survival_curves,
         "chapters": chapters,
         "source": "Real processed artifacts",
@@ -439,9 +466,18 @@ session_features = load_parquet_safe(DATA_DIR / "session_features.parquet")
 catalog_real = load_parquet_safe(SYNTHETIC_DIR / "catalog.parquet")
 quality_real = load_parquet_safe(DATA_DIR / "quality_scores.parquet")
 ablation_real = load_parquet_safe(DATA_DIR / "ablation_results.parquet")
+ranking_metrics_real = load_parquet_safe(DATA_DIR / "completion_ndcg_metrics.parquet")
+oracle_real = load_parquet_safe(DATA_DIR / "oracle_analysis.parquet")
 
 if session_features is not None and catalog_real is not None:
-    data = build_real_dashboard_data(session_features, catalog_real, quality_real, ablation_real)
+    data = build_real_dashboard_data(
+        session_features,
+        catalog_real,
+        quality_real,
+        ablation_real,
+        ranking_metrics_real,
+        oracle_real,
+    )
 
 
 with st.sidebar:
@@ -465,11 +501,14 @@ if page == "Overview":
         "A recommender prototype that scores stories by reading depth, quality, dropout risk, and fit to the reader.",
     )
 
-    abl = data["ablation"]
-    metric_col = "CW-NDCG@10"
-    latest_metric = float(abl[metric_col].iloc[-1])
-    baseline_metric = float(abl[metric_col].iloc[0])
-    delta = latest_metric - baseline_metric
+    ranking_metrics = data["ranking_metrics"]
+    metric_row = ranking_metrics[ranking_metrics["k"] == 10]
+    if metric_row.empty:
+        metric_row = ranking_metrics.tail(1)
+    metric_row = metric_row.iloc[0]
+    latest_metric = float(metric_row["CW_NDCG"])
+    binary_metric = float(metric_row["Binary_NDCG"])
+    metric_delta = float(metric_row.get("delta", latest_metric - binary_metric))
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Users", f"{len(data['users']):,}", help="Unique users represented in the dashboard data.")
@@ -478,9 +517,28 @@ if page == "Overview":
     col4.metric(
         "CW-NDCG@10",
         f"{latest_metric:.3f}",
-        delta=f"{delta:+.3f}",
+        delta=f"{metric_delta:+.3f} vs binary",
         help=GLOSSARY["completion-weighted NDCG"],
     )
+
+    diag1, diag2, diag3 = st.columns(3)
+    diag1.metric(
+        "Binary NDCG@10",
+        f"{binary_metric:.3f}",
+        help="Standard NDCG using binary relevance instead of completion depth.",
+    )
+    if pd.notna(data["overall_recall_500"]):
+        diag2.metric(
+            "Overall Recall@500",
+            f"{data['overall_recall_500']:.3f}",
+            help="Fraction of positive held-out items recovered in the top 500 candidates.",
+        )
+    if pd.notna(data["tail_recall_500"]):
+        diag3.metric(
+            "Tail Recall@500",
+            f"{data['tail_recall_500']:.3f}",
+            help="Recall@500 for the least-popular item quartile. This is the current weakness.",
+        )
 
     st.subheader("How The System Works")
     flow_cols = st.columns(5)
@@ -605,7 +663,7 @@ elif page == "Recommendations":
 elif page == "Ablation Study":
     render_header(
         "Ablation Study",
-        "Shows whether each system layer improves ranking quality compared with the previous layer.",
+        "Diagnostic comparison of offline scoring variants. It should reveal regressions as well as gains.",
     )
 
     abl = data["ablation"].copy()
@@ -653,10 +711,16 @@ elif page == "Ablation Study":
     )
 
     delta = abl["CW-NDCG@10"].iloc[-1] - abl["CW-NDCG@10"].iloc[0]
-    st.info(
-        f"Current full-pipeline delta over baseline: {delta:+.3f}. "
-        "Treat this as prototype evidence, not a production benchmark."
-    )
+    if delta < 0:
+        st.warning(
+            f"Current ablation diagnostic is {delta:.3f} below baseline. "
+            "This means the latest reranking stack is not proven better by this artifact; treat it as a research signal, not a win."
+        )
+    else:
+        st.info(
+            f"Current ablation diagnostic is {delta:+.3f} over baseline. "
+            "Treat this as prototype evidence, not a production benchmark."
+        )
     render_reviewer_note()
 
 
