@@ -141,9 +141,10 @@ _BASE_TRANSITIONS: np.ndarray = np.array([
 # Helper: random simplex vector (Dirichlet with uniform α=1)
 # ---------------------------------------------------------------------------
 
-def _random_simplex(rng: np.random.Generator, dim: int) -> np.ndarray:
+def _random_simplex(rng: np.random.Generator, dim: int, concentration: float = 1.0) -> np.ndarray:
     """Return a vector on the probability simplex (sums to 1, all ≥ 0)."""
-    v = rng.dirichlet(np.ones(dim))
+    alpha = np.full(dim, max(float(concentration), 1e-3))
+    v = rng.dirichlet(alpha)
     return v.astype(np.float64)
 
 
@@ -155,6 +156,9 @@ def _generate_catalog(
     num_items: int,
     avg_chapters: int,
     rng: np.random.Generator,
+    quality_alpha: float = 2.0,
+    quality_beta: float = 5.0,
+    topic_concentration: float = 1.0,
 ) -> pd.DataFrame:
     """
     Create a synthetic book catalog.
@@ -182,7 +186,7 @@ def _generate_catalog(
         avg_rating, rating_count, chapter_count, avg_chapter_word_count,
         latent_quality, topic_vector.
     """
-    qualities = rng.beta(2, 5, size=num_items)
+    qualities = rng.beta(max(quality_alpha, 1e-3), max(quality_beta, 1e-3), size=num_items)
     chapter_counts = np.clip(rng.poisson(avg_chapters - 1, size=num_items) + 1, 1, None)
     word_counts = np.clip(rng.normal(BASE_WORDS_PER_CHAPTER, 800, size=num_items).astype(int), 800, None)
 
@@ -194,7 +198,7 @@ def _generate_catalog(
         item_id = f"item_{i:05d}"
         author_id = f"author_{rng.integers(0, max(1, num_items // 5)):04d}"
         genres = rng.choice(GENRE_POOL, size=rng.integers(1, 4), replace=False).tolist()
-        topic_vec = _random_simplex(rng, NMF_TOPICS_DIM)
+        topic_vec = _random_simplex(rng, NMF_TOPICS_DIM, concentration=topic_concentration)
 
         records.append({
             "item_id": item_id,
@@ -216,6 +220,8 @@ def _generate_catalog(
 def _generate_users(
     num_users: int,
     rng: np.random.Generator,
+    patience_multiplier: float = 1.0,
+    taste_concentration: float = 1.0,
 ) -> pd.DataFrame:
     """
     Create synthetic user profiles.
@@ -246,9 +252,9 @@ def _generate_users(
     for i in range(num_users):
         records.append({
             "user_id": f"user_{i:05d}",
-            "taste_vector": _random_simplex(rng, NMF_TOPICS_DIM).tolist(),
+            "taste_vector": _random_simplex(rng, NMF_TOPICS_DIM, concentration=taste_concentration).tolist(),
             "reading_speed_factor": float(np.clip(rng.lognormal(0, 0.25), 0.4, 3.0)),
-            "patience_factor": float(np.clip(rng.lognormal(0, 0.3), 0.3, 3.0)),
+            "patience_factor": float(np.clip(rng.lognormal(0, 0.3) * patience_multiplier, 0.3, 5.0)),
             "device_preference": devices[i],
         })
     return pd.DataFrame(records)
@@ -270,6 +276,9 @@ def _condition_transitions(
     quality: float,
     affinity: float,
     chapter_index: int,
+    transition_exit_multiplier: float = 1.0,
+    valley_multiplier: float = 1.0,
+    engaged_boost_multiplier: float = 1.0,
 ) -> np.ndarray:
     """
     Condition the base transition matrix on quality, affinity, and chapter.
@@ -297,9 +306,8 @@ def _condition_transitions(
     T = _BASE_TRANSITIONS.copy()
     # Combined signal: higher = better experience
     signal = np.clip((quality + max(affinity, 0.0)) / 2.0, 0.0, 1.0)
-
     # Boost engaged columns, penalise distracted / exiting
-    engaged_boost = 0.15 * signal      # up to +0.15 per engaged col
+    engaged_boost = 0.15 * signal * engaged_boost_multiplier      # up to +0.15 per engaged col
     distract_penalty = 0.12 * signal    # up to -0.12 for distracted
     exit_penalty = 0.10 * signal        # up to -0.10 for exiting
 
@@ -308,10 +316,11 @@ def _condition_transitions(
         T[row, _S["ENGAGED_SLOW"]] += engaged_boost * 0.5
         T[row, _S["DISTRACTED"]] = max(T[row, _S["DISTRACTED"]] - distract_penalty, 0.01)
         T[row, _S["EXITING"]] = max(T[row, _S["EXITING"]] - exit_penalty, 0.005)
+        T[row, _S["EXITING"]] = max(T[row, _S["EXITING"]] * transition_exit_multiplier, 0.0005)
 
     # Valley of death: chapters 3-5 add distracted mass
     if 3 <= chapter_index <= 5:
-        valley_boost = 0.08 * (1.0 - signal)  # worse for bad books
+        valley_boost = 0.08 * (1.0 - signal) * valley_multiplier  # worse for bad books
         for row in range(_N_STATES - 1):
             T[row, _S["DISTRACTED"]] += valley_boost
             T[row, _S["EXITING"]] += valley_boost * 0.3
@@ -328,6 +337,9 @@ def _condition_emissions(
     affinity: float,
     speed_factor: float,
     patience_factor: float,
+    exit_probability_multiplier: float = 1.0,
+    speed_multiplier: float = 1.0,
+    patience_multiplier: float = 1.0,
 ) -> np.ndarray:
     """
     Personalise emission parameters per user-book pair.
@@ -343,15 +355,17 @@ def _condition_emissions(
     """
     E = _BASE_EMISSIONS.copy()
     signal = np.clip((quality + max(affinity, 0.0)) / 2.0, 0.0, 1.0)
+    effective_patience = max(float(patience_factor) * float(patience_multiplier), 1e-3)
 
     # Speed column
-    E[:, 0] *= speed_factor
+    E[:, 0] *= speed_factor * speed_multiplier
 
     # Pause column — patient users pause less for engagement reasons
-    E[:, 1] *= np.clip(1.0 / patience_factor, 0.3, 2.0)
+    E[:, 1] *= np.clip(1.0 / effective_patience, 0.3, 2.0)
 
     # Exit column — reduced by both signal and patience
-    exit_scale = np.clip(1.0 - 0.6 * signal, 0.2, 1.5) * np.clip(1.0 / patience_factor, 0.4, 2.0)
+    exit_scale = np.clip(1.0 - 0.6 * signal, 0.2, 1.5) * np.clip(1.0 / effective_patience, 0.4, 2.0)
+    exit_scale *= exit_probability_multiplier
     E[:-1, 3] *= exit_scale  # don't touch absorbing state
 
     return E
@@ -364,6 +378,12 @@ def _simulate_session(
     chapter_words: int,
     session_start_ts: datetime,
     rng: np.random.Generator,
+    exit_probability_multiplier: float = 1.0,
+    transition_exit_multiplier: float = 1.0,
+    speed_multiplier: float = 1.0,
+    patience_multiplier: float = 1.0,
+    valley_multiplier: float = 1.0,
+    engaged_boost_multiplier: float = 1.0,
 ) -> list[dict[str, Any]]:
     """
     Simulate a single reading session as a Markov chain.
@@ -400,11 +420,21 @@ def _simulate_session(
     affinity = _cosine_similarity(taste, topic)
     quality = item_row["latent_quality"]
 
-    T = _condition_transitions(quality, affinity, chapter_index)
+    T = _condition_transitions(
+        quality,
+        affinity,
+        chapter_index,
+        transition_exit_multiplier=transition_exit_multiplier,
+        valley_multiplier=valley_multiplier,
+        engaged_boost_multiplier=engaged_boost_multiplier,
+    )
     E = _condition_emissions(
         quality, affinity,
         user_row["reading_speed_factor"],
         user_row["patience_factor"],
+        exit_probability_multiplier=exit_probability_multiplier,
+        speed_multiplier=speed_multiplier,
+        patience_multiplier=patience_multiplier,
     )
 
     events: list[dict[str, Any]] = []
@@ -557,6 +587,16 @@ def generate_synthetic_dataset(
     sessions_per_user: int = 30,
     seed: int = 42,
     output_dir: Path | None = None,
+    exit_probability_multiplier: float = 1.0,
+    transition_exit_multiplier: float = 1.0,
+    speed_multiplier: float = 1.0,
+    patience_multiplier: float = 1.0,
+    valley_multiplier: float = 1.0,
+    engaged_boost_multiplier: float = 1.0,
+    quality_alpha: float = 2.0,
+    quality_beta: float = 5.0,
+    topic_concentration: float = 1.0,
+    taste_concentration: float = 1.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     End-to-end synthetic telemetry generator.
@@ -593,11 +633,23 @@ def generate_synthetic_dataset(
 
     # ---- Generate catalog & users ----
     print("> Generating catalog ...")
-    catalog_df = _generate_catalog(num_items, avg_chapters, rng)
+    catalog_df = _generate_catalog(
+        num_items,
+        avg_chapters,
+        rng,
+        quality_alpha=quality_alpha,
+        quality_beta=quality_beta,
+        topic_concentration=topic_concentration,
+    )
     print(f"  {len(catalog_df)} items, quality mean={catalog_df['latent_quality'].mean():.3f}")
 
     print("> Generating users ...")
-    users_df = _generate_users(num_users, rng)
+    users_df = _generate_users(
+        num_users,
+        rng,
+        patience_multiplier=patience_multiplier,
+        taste_concentration=taste_concentration,
+    )
     print(f"  {len(users_df)} users")
 
     # Pre-compute numpy arrays for fast affinity lookups
@@ -649,7 +701,18 @@ def generate_synthetic_dataset(
                 # Per-chapter word count variation (±20%)
                 ch_words = max(400, int(word_count * rng.uniform(0.8, 1.2)))
                 session_events = _simulate_session(
-                    user_row, item_row, ch, ch_words, user_ts, rng,
+                    user_row,
+                    item_row,
+                    ch,
+                    ch_words,
+                    user_ts,
+                    rng,
+                    exit_probability_multiplier=exit_probability_multiplier,
+                    transition_exit_multiplier=transition_exit_multiplier,
+                    speed_multiplier=speed_multiplier,
+                    patience_multiplier=patience_multiplier,
+                    valley_multiplier=valley_multiplier,
+                    engaged_boost_multiplier=engaged_boost_multiplier,
                 )
                 all_events.extend(session_events)
 
@@ -720,6 +783,16 @@ if __name__ == "__main__":
     parser.add_argument("--avg-chapters", type=int, default=15)
     parser.add_argument("--sessions-per-user", type=int, default=30)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--exit-probability-multiplier", type=float, default=1.0)
+    parser.add_argument("--transition-exit-multiplier", type=float, default=1.0)
+    parser.add_argument("--speed-multiplier", type=float, default=1.0)
+    parser.add_argument("--patience-multiplier", type=float, default=1.0)
+    parser.add_argument("--valley-multiplier", type=float, default=1.0)
+    parser.add_argument("--engaged-boost-multiplier", type=float, default=1.0)
+    parser.add_argument("--quality-alpha", type=float, default=2.0)
+    parser.add_argument("--quality-beta", type=float, default=5.0)
+    parser.add_argument("--topic-concentration", type=float, default=1.0)
+    parser.add_argument("--taste-concentration", type=float, default=1.0)
     args = parser.parse_args()
 
     events_df, catalog_df, users_df = generate_synthetic_dataset(
@@ -728,6 +801,16 @@ if __name__ == "__main__":
         avg_chapters=args.avg_chapters,
         sessions_per_user=args.sessions_per_user,
         seed=args.seed,
+        exit_probability_multiplier=args.exit_probability_multiplier,
+        transition_exit_multiplier=args.transition_exit_multiplier,
+        speed_multiplier=args.speed_multiplier,
+        patience_multiplier=args.patience_multiplier,
+        valley_multiplier=args.valley_multiplier,
+        engaged_boost_multiplier=args.engaged_boost_multiplier,
+        quality_alpha=args.quality_alpha,
+        quality_beta=args.quality_beta,
+        topic_concentration=args.topic_concentration,
+        taste_concentration=args.taste_concentration,
     )
 
     # ---- Summary statistics ----
