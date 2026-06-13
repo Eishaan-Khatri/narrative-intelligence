@@ -197,6 +197,15 @@ def generate_demo_data() -> dict:
     }
 
 
+def normalize_ablation_columns(ablation: pd.DataFrame) -> pd.DataFrame:
+    """Normalize old/new ablation metric column names for dashboard views."""
+    return ablation.rename(columns={
+        "model": "Model",
+        "CW_NDCG@10": "CW-NDCG@10",
+        "Binary_NDCG@10": "Binary-NDCG@10",
+    })
+
+
 # ---------------------------------------------------------------------------
 # Load data
 # ---------------------------------------------------------------------------
@@ -207,7 +216,9 @@ session_features = load_parquet_safe(DATA_DIR / "session_features.parquet")
 ablation_real = load_parquet_safe(DATA_DIR / "ablation_results.parquet")
 
 if ablation_real is not None:
-    data["ablation"] = ablation_real
+    data["ablation"] = normalize_ablation_columns(ablation_real)
+else:
+    data["ablation"] = normalize_ablation_columns(data["ablation"])
 
 # ---------------------------------------------------------------------------
 # Sidebar
