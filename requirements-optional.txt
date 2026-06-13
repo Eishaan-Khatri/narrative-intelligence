@@ -1,0 +1,4 @@
+# Optional extras.
+# scikit-survival enables Random Survival Forest comparison in survival_model.py.
+# If unavailable, the pipeline falls back to CoxPH.
+scikit-survival>=0.22.0
