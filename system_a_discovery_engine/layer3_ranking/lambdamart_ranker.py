@@ -23,6 +23,7 @@ lambda gradients.
   6    recency_decay                exp(-age_days / 30)
   7    genre_match_score            cos-sim(user topic, item topic)
   8    novelty_score                -log2(item_popularity_pctl + 0.01)
+  9    tail_boost_score             controlled boost for under-popular items
   ===  ===========================  =====================================
 
 **Training**:
@@ -68,6 +69,7 @@ RANKING_FEATURES: list[str] = [
     "recency_decay",
     "genre_match_score",
     "novelty_score",
+    "tail_boost_score",
 ]
 
 
@@ -128,12 +130,54 @@ def build_ranking_features(df: pd.DataFrame) -> pd.DataFrame:
     -------
     pd.DataFrame  — sorted by user_id for proper group construction.
     """
+    df = df.copy()
+    if "tail_boost_score" not in df.columns:
+        df["tail_boost_score"] = 0.0
     required = set(RANKING_FEATURES) | {"user_id", "relevance"}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Missing columns: {missing}")
+    for feature in RANKING_FEATURES:
+        df[feature] = pd.to_numeric(df[feature], errors="coerce").fillna(0.0)
     df = df.sort_values("user_id").reset_index(drop=True)
     return df
+
+
+def apply_reranker_controls(
+    df: pd.DataFrame,
+    tail_boost_weight: float = 0.0,
+    survival_penalty_weight: float = 1.0,
+    max_hazard_score: float = 0.5,
+) -> pd.DataFrame:
+    """Apply conservative reranker controls before LambdaMART training.
+
+    ``survival_penalty_weight`` lets us reduce hazard influence when survival
+    risk overpowers relevance. ``tail_boost_weight`` adds a bounded signal for
+    under-popular candidates, using ``tail_boost_score`` when present or deriving
+    it from ``novelty_score`` as a fallback.
+    """
+    out = df.copy()
+    if "hazard_score" in out.columns:
+        out["hazard_score"] = (
+            pd.to_numeric(out["hazard_score"], errors="coerce")
+            .fillna(0.0)
+            .clip(lower=0.0, upper=max_hazard_score)
+            * survival_penalty_weight
+        )
+    if "tail_boost_score" not in out.columns:
+        if "novelty_score" in out.columns:
+            novelty = pd.to_numeric(out["novelty_score"], errors="coerce").fillna(0.0)
+            threshold = novelty.quantile(0.75)
+            out["tail_boost_score"] = (novelty >= threshold).astype(float)
+        else:
+            out["tail_boost_score"] = 0.0
+    out["tail_boost_score"] = (
+        pd.to_numeric(out["tail_boost_score"], errors="coerce")
+        .fillna(0.0)
+        .clip(lower=0.0, upper=1.0)
+        * tail_boost_weight
+    )
+    return out
 
 
 def make_group_array(df: pd.DataFrame, qid_col: str = "user_id") -> np.ndarray:
@@ -348,6 +392,7 @@ def generate_synthetic_ranking_data(
     genre_match = rng.uniform(0.0, 1.0, n_total)
     popularity_pctl = rng.uniform(0.0, 1.0, n_total)
     novelty_score = -np.log2(popularity_pctl + 0.01)
+    tail_boost_score = (popularity_pctl <= 0.25).astype(float)
 
     # Synthetic relevance — probabilistically correlated with features
     latent_quality = (
@@ -377,6 +422,7 @@ def generate_synthetic_ranking_data(
         "recency_decay": recency_decay,
         "genre_match_score": genre_match,
         "novelty_score": novelty_score,
+        "tail_boost_score": tail_boost_score,
         "relevance": relevance,
     })
 
@@ -387,6 +433,9 @@ def generate_synthetic_ranking_data(
 
 def run_ranking_pipeline(
     df: pd.DataFrame | None = None,
+    tail_boost_weight: float = 0.10,
+    survival_penalty_weight: float = 0.75,
+    max_hazard_score: float = 0.35,
     verbose: bool = True,
 ) -> Tuple[lgb.LGBMRanker, float]:
     """End-to-end LambdaMART training and evaluation.
@@ -406,6 +455,12 @@ def run_ranking_pipeline(
     """
     if df is None:
         df = generate_synthetic_ranking_data()
+    df = apply_reranker_controls(
+        df,
+        tail_boost_weight=tail_boost_weight,
+        survival_penalty_weight=survival_penalty_weight,
+        max_hazard_score=max_hazard_score,
+    )
     df = build_ranking_features(df)
 
     train_df, test_df = split_by_user(df)

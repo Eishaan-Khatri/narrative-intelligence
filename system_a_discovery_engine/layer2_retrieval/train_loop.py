@@ -307,9 +307,11 @@ def mine_hard_negatives(
     dataset: RecommendationDataset,
     item_catalog_feats: np.ndarray,
     item_ids_per_sample: np.ndarray,
+    item_log_popularity: np.ndarray | None = None,
     catalog_sample_size: int = HARD_NEG_CATALOG_SAMPLE,
     pool_size: int = HARD_NEG_POOL_SIZE,
     samples_per_pos: int = HARD_NEG_SAMPLES_PER_POS,
+    popularity_balance_alpha: float = 0.0,
     seed: int = 0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Mine hard negatives for each training sample.
@@ -329,9 +331,12 @@ def mine_hard_negatives(
         dataset:            The training dataset.
         item_catalog_feats: (N_items, 83) full catalog item features.
         item_ids_per_sample: (N_samples,) item index for each training sample.
+        item_log_popularity: Catalog-level log(1 + interaction_count).
         catalog_sample_size: Number of random catalog items to score.
         pool_size:          Top-K non-interacted items to keep.
         samples_per_pos:    How many hard negatives to draw per positive.
+        popularity_balance_alpha: Inverse-popularity sampling strength inside
+            the mined hard-negative pool. 0 keeps uniform sampling.
         seed:               Random seed for reproducibility.
 
     Returns:
@@ -342,6 +347,9 @@ def mine_hard_negatives(
     model.eval()
     n_catalog = item_catalog_feats.shape[0]
     n_samples = len(dataset)
+    if item_log_popularity is None:
+        item_log_popularity = np.log1p(np.arange(n_catalog, dtype=np.float32) + 1.0)
+    item_log_popularity = np.asarray(item_log_popularity, dtype=np.float32)
 
     # Pre-compute all item embeddings for the catalog subset
     catalog_tensor = torch.as_tensor(item_catalog_feats, dtype=torch.float32, device=device)
@@ -394,18 +402,23 @@ def mine_hard_negatives(
             for si in sample_indices:
                 rand_idx = rng.randint(0, n_catalog)
                 neg_feats[si] = item_catalog_feats[rand_idx]
-                neg_pops[si] = np.log1p(1.0)
+                neg_pops[si] = item_log_popularity[rand_idx]
             continue
 
         topk_vals, topk_local = torch.topk(scores_masked, k)
         topk_catalog_idx = cand_indices[topk_local.cpu().numpy()]
 
         # For each sample of this user, randomly pick from the pool
+        pool_weights = None
+        if popularity_balance_alpha > 0:
+            pool_pop = np.expm1(item_log_popularity[topk_catalog_idx]).clip(min=1.0)
+            pool_weights = np.power(pool_pop, -popularity_balance_alpha)
+            pool_weights = pool_weights / pool_weights.sum()
         for si in sample_indices:
-            pick = rng.choice(len(topk_catalog_idx))
+            pick = rng.choice(len(topk_catalog_idx), p=pool_weights)
             chosen_item = topk_catalog_idx[pick]
             neg_feats[si] = item_catalog_feats[chosen_item]
-            neg_pops[si] = np.log1p(float(chosen_item + 1))  # proxy popularity
+            neg_pops[si] = item_log_popularity[chosen_item]
 
     model.train()
     return neg_feats, neg_pops
@@ -699,9 +712,12 @@ def train(
     phase1_epochs: int = PHASE1_EPOCHS,
     batch_size: int = BATCH_SIZE,
     seed: int = 42,
+    learning_rate: float = LR,
+    weight_decay: float = WEIGHT_DECAY,
     phase1_only: bool = False,
     hard_negative_weight: float = 1.0,
     tail_oversample_factor: int = 1,
+    hard_negative_popularity_alpha: float = 0.0,
 ) -> TwoTowerModel:
     """Run the full two-phase training pipeline.
 
@@ -714,6 +730,13 @@ def train(
         phase1_epochs:         Epochs in Phase 1 (in-batch negatives).
         batch_size:            Mini-batch size.
         seed:                  Random seed.
+        learning_rate:         Adam learning rate.
+        weight_decay:          Adam weight decay.
+        phase1_only:           Disable Phase 2 hard-negative training.
+        hard_negative_weight:  Multiplier for Phase 2 hard-negative loss.
+        tail_oversample_factor: Repeat tail positive samples during training.
+        hard_negative_popularity_alpha: Inverse-popularity weighting for mined
+            hard-negative pool sampling.
 
     Returns:
         The trained ``TwoTowerModel``.
@@ -727,7 +750,11 @@ def train(
 
     print(f"  Epochs: {total_epochs} (Phase 1: {phase1_epochs}, Phase 2: {total_epochs - phase1_epochs})")
     print(f"  Batch size: {batch_size}  |  Device: {device}")
-    print(f"  Phase 1 only: {phase1_only}  |  Hard-neg weight: {hard_negative_weight:.2f}  |  Tail oversample: {tail_oversample_factor}x")
+    print(f"  LR: {learning_rate:g}  |  Weight decay: {weight_decay:g}")
+    print(
+        f"  Phase 1 only: {phase1_only}  |  Hard-neg weight: {hard_negative_weight:.2f}  |  "
+        f"Tail oversample: {tail_oversample_factor}x  |  Hard-neg pop alpha: {hard_negative_popularity_alpha:.2f}"
+    )
     print()
 
     # ---- Data ----
@@ -767,6 +794,7 @@ def train(
     train_item_ids = item_ids[train_idx]
     val_user_feats = user_feats[val_idx]
     val_item_ids = item_ids[val_idx]
+    item_log_popularity = np.log1p(item_popularity).astype(np.float32)
 
     train_loader = DataLoader(
         train_ds, batch_size=batch_size, shuffle=True,
@@ -777,7 +805,7 @@ def train(
 
     # ---- Model + Optimizer ----
     model = TwoTowerModel().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     # ---- Metric tracking ----
     history_loss: List[float] = []
@@ -800,7 +828,13 @@ def train(
         if is_hard_neg_epoch:
             print(f"  [Epoch {epoch}] Mining hard negatives...")
             neg_feats, neg_pops = mine_hard_negatives(
-                model, train_ds, item_catalog, train_item_ids, seed=epoch,
+                model,
+                train_ds,
+                item_catalog,
+                train_item_ids,
+                item_log_popularity=item_log_popularity,
+                popularity_balance_alpha=hard_negative_popularity_alpha,
+                seed=epoch,
             )
             train_ds.set_hard_negatives(neg_feats, neg_pops)
             # Recreate DataLoader to pick up new data

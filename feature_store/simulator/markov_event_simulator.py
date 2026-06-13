@@ -698,6 +698,7 @@ def generate_synthetic_dataset(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import argparse
     import io
     import textwrap
 
@@ -713,12 +714,20 @@ if __name__ == "__main__":
     +--------------------------------------------------------------+
     """))
 
+    parser = argparse.ArgumentParser(description="Generate synthetic reading telemetry.")
+    parser.add_argument("--num-users", type=int, default=1000)
+    parser.add_argument("--num-items", type=int, default=500)
+    parser.add_argument("--avg-chapters", type=int, default=15)
+    parser.add_argument("--sessions-per-user", type=int, default=30)
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
     events_df, catalog_df, users_df = generate_synthetic_dataset(
-        num_users=1000,
-        num_items=500,
-        avg_chapters=15,
-        sessions_per_user=30,
-        seed=42,
+        num_users=args.num_users,
+        num_items=args.num_items,
+        avg_chapters=args.avg_chapters,
+        sessions_per_user=args.sessions_per_user,
+        seed=args.seed,
     )
 
     # ---- Summary statistics ----

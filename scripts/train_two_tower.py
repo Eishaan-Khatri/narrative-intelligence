@@ -37,7 +37,15 @@ def main() -> int:
         help="Repeat tail-item positive samples this many times during training.",
     )
     parser.add_argument("--batch-size", type=int, default=1024, help="Training batch size.")
+    parser.add_argument("--learning-rate", type=float, default=1e-3, help="Adam learning rate.")
+    parser.add_argument("--weight-decay", type=float, default=1e-5, help="Adam weight decay.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
+    parser.add_argument(
+        "--hard-negative-popularity-alpha",
+        type=float,
+        default=0.0,
+        help="Inverse-popularity weighting strength when sampling from mined hard-negative pools.",
+    )
     parser.add_argument(
         "--synthetic-users",
         type=int,
@@ -69,9 +77,12 @@ def main() -> int:
         phase1_epochs=args.phase1_epochs,
         batch_size=args.batch_size,
         seed=args.seed,
+        learning_rate=args.learning_rate,
+        weight_decay=args.weight_decay,
         phase1_only=args.phase1_only,
         hard_negative_weight=args.hard_negative_weight,
         tail_oversample_factor=args.tail_oversample_factor,
+        hard_negative_popularity_alpha=args.hard_negative_popularity_alpha,
     )
     return 0
 

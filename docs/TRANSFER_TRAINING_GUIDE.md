@@ -91,20 +91,34 @@ Quick smoke test:
 python scripts/train_two_tower.py --epochs 1 --phase1-epochs 1 --batch-size 512
 ```
 
-Full default training:
+Recommended if GPU access is limited:
 
 ```powershell
-python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024
+python scripts/run_gpu_training_suite.py --batch-size 1024
 ```
 
-Recommended research comparison after the latest fixes:
+This runs three retrieval experiments in one session:
+
+- Phase 1 only, learning rate `1e-3`
+- Phase 1 only with tail-positive oversampling, learning rate `5e-4`
+- Tuned hard negatives with lower loss weight, tail-positive oversampling, and
+  popularity-balanced hard-negative sampling
+
+The suite saves each run under `data/processed/experiments/`, writes
+`data/processed/gpu_training_suite_summary.csv`, restores the best run to the
+normal artifact paths, and then runs downstream FAISS/ranking/evaluation steps.
+
+Manual fallback commands:
 
 ```powershell
 # 1. Baseline: no hard-negative phase, because the previous run degraded after epoch 5.
-python scripts/train_two_tower.py --epochs 5 --phase1-only --batch-size 1024
+python scripts/train_two_tower.py --epochs 5 --phase1-only --batch-size 1024 --learning-rate 1e-3
 
-# 2. Tuned Phase 2: lower hard-negative pressure and oversample tail positives.
-python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024 --hard-negative-weight 0.25 --tail-oversample-factor 3
+# 2. Phase 1 with tail-positive oversampling.
+python scripts/train_two_tower.py --epochs 8 --phase1-only --batch-size 1024 --learning-rate 5e-4 --tail-oversample-factor 3
+
+# 3. Tuned Phase 2: lower hard-negative pressure, tail positives, and popularity-balanced hard negatives.
+python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024 --learning-rate 5e-4 --hard-negative-weight 0.25 --tail-oversample-factor 3 --hard-negative-popularity-alpha 0.75
 ```
 
 Compare the two runs using `data/processed/retrieval_metrics.parquet`. Treat
@@ -120,6 +134,19 @@ Outputs are written to `data/processed/`:
 - `user_embeddings.parquet`
 - `training_curves.png`
 - `retrieval_metrics.parquet`
+- `gpu_training_suite_summary.csv` when using the suite script
+
+## Larger Catalog Regeneration
+
+The simulator can now be run directly with larger catalog settings:
+
+```powershell
+python feature_store/simulator/markov_event_simulator.py --num-users 3000 --num-items 5000 --sessions-per-user 20
+python run_pipeline.py --from session_features
+```
+
+This is slower than retrieval-only training. Use it only when you have enough
+time on the target machine to regenerate the upstream feature store.
 
 ## Current Limitations
 
@@ -135,4 +162,4 @@ Outputs are written to `data/processed/`:
   from the full event log first.
 - The current retrieval catalog is still synthetic and small compared with the
   original blueprint. For a stronger submission, regenerate with a larger
-  catalog and then rerun `python run_pipeline.py --from retrieval`.
+  catalog and then rerun `python run_pipeline.py --from session_features`.

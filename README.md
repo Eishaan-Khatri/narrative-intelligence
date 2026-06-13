@@ -68,9 +68,7 @@ model, use the dedicated guide:
 
 ```bash
 python scripts/check_training_ready.py
-python scripts/train_two_tower.py --epochs 1 --phase1-epochs 1 --batch-size 512
-python scripts/train_two_tower.py --epochs 5 --phase1-only --batch-size 1024
-python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024 --hard-negative-weight 0.25 --tail-oversample-factor 3
+python scripts/run_gpu_training_suite.py --batch-size 1024
 ```
 
 Full instructions: `docs/TRANSFER_TRAINING_GUIDE.md`.
@@ -83,6 +81,11 @@ toy data only when those artifacts are absent or invalid.
 The trainer now writes `data/processed/retrieval_metrics.parquet` with
 Recall@10, Recall@20, Recall@50, MRR@10, NDCG@10, and tail/mid/popular splits.
 Use Recall@500 only as a ceiling diagnostic on the current small catalog.
+
+For limited GPU access, `scripts/run_gpu_training_suite.py` runs Phase-1-only,
+tail-oversampled, and tuned hard-negative variants in one session, stores each
+run under `data/processed/experiments/`, restores the best run to the canonical
+artifact paths, and then runs downstream FAISS/ranking/evaluation steps.
 
 ## Repository Structure
 
