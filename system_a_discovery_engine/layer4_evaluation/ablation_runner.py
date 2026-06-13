@@ -273,7 +273,7 @@ def _user_ndcg(
 def run_ablation(
     data: Dict[str, np.ndarray] | None = None,
     k_ndcg: int = 10,
-    k_recall: int = 500,
+    recall_ks: Tuple[int, ...] = (10, 20, 50, 500),
     verbose: bool = True,
 ) -> pd.DataFrame:
     """Execute the full 5-model ablation study.
@@ -285,8 +285,8 @@ def run_ablation(
         is generated automatically.
     k_ndcg : int
         Cutoff for NDCG.
-    k_recall : int
-        Cutoff for Recall.
+    recall_ks : tuple[int, ...]
+        Recall cutoffs. Recall@500 is retained as a ceiling diagnostic only.
     verbose : bool
 
     Returns
@@ -341,14 +341,16 @@ def run_ablation(
         sc = models[mid]
         cw_ndcg = _user_ndcg(sc, graded_rel, k_ndcg)
         bn_ndcg = _user_ndcg(sc, binary_rel, k_ndcg)
-        rec500 = _recall_at_k(sc, pos_mask, k_recall) if mid in ("M2", "M3", "M4") else np.nan
-        rows.append({
+        row = {
             "model": mid,
             "description": descriptions[mid],
             "CW_NDCG@10": round(cw_ndcg, 4),
             "Binary_NDCG@10": round(bn_ndcg, 4),
-            "Recall@500": round(rec500, 4) if not np.isnan(rec500) else None,
-        })
+        }
+        for k_recall in recall_ks:
+            rec = _recall_at_k(sc, pos_mask, k_recall) if mid in ("M2", "M3", "M4") else np.nan
+            row[f"Recall@{k_recall}"] = round(rec, 4) if not np.isnan(rec) else None
+        rows.append(row)
 
     results = pd.DataFrame(rows)
     return results
@@ -376,18 +378,22 @@ def plot_ablation(results: pd.DataFrame, path: Path | None = None) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     models = results["model"].values
-    metrics = ["CW_NDCG@10", "Binary_NDCG@10", "Recall@500"]
+    metrics = [
+        metric
+        for metric in ["CW_NDCG@10", "Binary_NDCG@10", "Recall@10", "Recall@20", "Recall@50"]
+        if metric in results.columns
+    ]
     n_models = len(models)
     n_metrics = len(metrics)
     x = np.arange(n_models)
-    width = 0.25
+    width = min(0.8 / max(len(metrics), 1), 0.25)
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    colours = ["#2196F3", "#4CAF50", "#FF9800"]
+    colours = ["#2196F3", "#4CAF50", "#FF9800", "#7C3AED", "#DC2626"]
 
     for i, metric in enumerate(metrics):
         vals = results[metric].fillna(0).values.astype(float)
-        bars = ax.bar(x + i * width, vals, width, label=metric, color=colours[i])
+        bars = ax.bar(x + i * width, vals, width, label=metric, color=colours[i % len(colours)])
         for bar, v in zip(bars, vals):
             if v > 0:
                 ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.005,
@@ -397,7 +403,7 @@ def plot_ablation(results: pd.DataFrame, path: Path | None = None) -> Path:
     ax.set_ylabel("Metric Value", fontsize=12)
     ax.set_title("Ablation Study — Incremental Pipeline Component Impact",
                  fontsize=14, fontweight="bold")
-    ax.set_xticks(x + width)
+    ax.set_xticks(x + width * max(len(metrics) - 1, 1) / 2)
     ax.set_xticklabels(models, fontsize=11)
     ax.legend(fontsize=10)
     ax.set_ylim(0, min(1.0, results[metrics].max().max() * 1.3))

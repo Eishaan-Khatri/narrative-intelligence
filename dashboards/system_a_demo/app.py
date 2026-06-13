@@ -180,6 +180,8 @@ GLOSSARY = {
     "LambdaMART": "A learning-to-rank model that reorders candidates using several business and behavior features.",
     "survival model": "A model that estimates where users are likely to stop reading or abandon a story.",
     "completion-weighted NDCG": "A ranking metric that gives more credit when recommended stories are actually read deeply, not just clicked.",
+    "Recall@50": "The share of held-out positive items found in the top 50 retrieved candidates. More meaningful here than Recall@500.",
+    "MRR@10": "Mean reciprocal rank at 10. Higher means the first relevant recommendation appears closer to the top.",
     "ablation study": "A comparison where one system layer is added at a time to measure what each layer contributes.",
     "hazard score": "The estimated risk that a user will abandon a story at a given point.",
     "quality score": "A PCA-based score built from completion, return, engagement, sentiment proxy, and structural signals.",
@@ -237,6 +239,26 @@ def normalize_ablation_columns(ablation: pd.DataFrame) -> pd.DataFrame:
     return renamed
 
 
+def retrieval_metric_value(
+    retrieval_metrics: pd.DataFrame | None,
+    metric: str,
+    k: int,
+    segment: str = "all",
+) -> float:
+    if retrieval_metrics is None or retrieval_metrics.empty:
+        return np.nan
+    view = retrieval_metrics.copy()
+    if "is_best_r50_epoch" in view.columns and view["is_best_r50_epoch"].fillna(False).any():
+        view = view[view["is_best_r50_epoch"].fillna(False)]
+    elif "epoch" in view.columns:
+        view = view[view["epoch"] == view["epoch"].max()]
+    view = view[(view["segment"] == segment) & (view["k"] == k)]
+    if view.empty or metric not in view.columns:
+        return np.nan
+    values = view[metric].dropna()
+    return float(values.iloc[-1]) if not values.empty else np.nan
+
+
 @st.cache_data
 def generate_demo_data() -> dict:
     np.random.seed(42)
@@ -280,8 +302,22 @@ def generate_demo_data() -> dict:
             ],
             "CW-NDCG@10": [0.312, 0.387, 0.421, 0.448, 0.483],
             "Binary-NDCG@10": [0.445, 0.472, 0.501, 0.512, 0.524],
-            "Recall@500": [np.nan, np.nan, 0.723, 0.698, 0.698],
+            "Recall@10": [np.nan, np.nan, 0.094, 0.089, 0.086],
+            "Recall@20": [np.nan, np.nan, 0.143, 0.137, 0.132],
+            "Recall@50": [np.nan, np.nan, 0.201, 0.188, 0.181],
+            "Recall@500": [np.nan, np.nan, 1.000, 1.000, 1.000],
         }
+    )
+    retrieval_metrics = pd.DataFrame(
+        [
+            {"epoch": 4, "segment": "all", "k": 10, "Recall": 0.094, "MRR": 0.046, "NDCG": 0.058, "n": 9008, "phase": 1, "is_best_r50_epoch": True},
+            {"epoch": 4, "segment": "all", "k": 20, "Recall": 0.143, "MRR": np.nan, "NDCG": np.nan, "n": 9008, "phase": 1, "is_best_r50_epoch": True},
+            {"epoch": 4, "segment": "all", "k": 50, "Recall": 0.201, "MRR": np.nan, "NDCG": np.nan, "n": 9008, "phase": 1, "is_best_r50_epoch": True},
+            {"epoch": 4, "segment": "all", "k": 500, "Recall": 1.000, "MRR": np.nan, "NDCG": np.nan, "n": 9008, "phase": 1, "is_best_r50_epoch": True},
+            {"epoch": 4, "segment": "tail", "k": 50, "Recall": 0.061, "MRR": np.nan, "NDCG": np.nan, "n": 1600, "phase": 1, "is_best_r50_epoch": True},
+            {"epoch": 4, "segment": "mid", "k": 50, "Recall": 0.172, "MRR": np.nan, "NDCG": np.nan, "n": 3600, "phase": 1, "is_best_r50_epoch": True},
+            {"epoch": 4, "segment": "popular", "k": 50, "Recall": 0.318, "MRR": np.nan, "NDCG": np.nan, "n": 3808, "phase": 1, "is_best_r50_epoch": True},
+        ]
     )
 
     chapters = np.arange(1, 31)
@@ -303,6 +339,7 @@ def generate_demo_data() -> dict:
                 "delta": [-0.041],
             }
         ),
+        "retrieval_metrics": retrieval_metrics,
         "overall_recall_500": np.nan,
         "tail_recall_500": np.nan,
         "survival_curves": survival_curves,
@@ -319,6 +356,7 @@ def build_real_dashboard_data(
     _quality_scores: pd.DataFrame | None,
     _ablation: pd.DataFrame | None,
     _ranking_metrics: pd.DataFrame | None,
+    _retrieval_metrics: pd.DataFrame | None,
     _oracle_analysis: pd.DataFrame | None,
 ) -> dict:
     items = _catalog.copy()
@@ -390,6 +428,7 @@ def build_real_dashboard_data(
         "items": items,
         "ablation": normalize_ablation_columns(_ablation) if _ablation is not None else generate_demo_data()["ablation"],
         "ranking_metrics": ranking_metrics,
+        "retrieval_metrics": _retrieval_metrics,
         "overall_recall_500": overall_recall_500,
         "tail_recall_500": tail_recall_500,
         "survival_curves": survival_curves,
@@ -467,6 +506,7 @@ catalog_real = load_parquet_safe(SYNTHETIC_DIR / "catalog.parquet")
 quality_real = load_parquet_safe(DATA_DIR / "quality_scores.parquet")
 ablation_real = load_parquet_safe(DATA_DIR / "ablation_results.parquet")
 ranking_metrics_real = load_parquet_safe(DATA_DIR / "completion_ndcg_metrics.parquet")
+retrieval_metrics_real = load_parquet_safe(DATA_DIR / "retrieval_metrics.parquet")
 oracle_real = load_parquet_safe(DATA_DIR / "oracle_analysis.parquet")
 
 if session_features is not None and catalog_real is not None:
@@ -476,6 +516,7 @@ if session_features is not None and catalog_real is not None:
         quality_real,
         ablation_real,
         ranking_metrics_real,
+        retrieval_metrics_real,
         oracle_real,
     )
 
@@ -509,6 +550,12 @@ if page == "Overview":
     latest_metric = float(metric_row["CW_NDCG"])
     binary_metric = float(metric_row["Binary_NDCG"])
     metric_delta = float(metric_row.get("delta", latest_metric - binary_metric))
+    retrieval_metrics = data.get("retrieval_metrics")
+    recall_10 = retrieval_metric_value(retrieval_metrics, "Recall", 10)
+    recall_50 = retrieval_metric_value(retrieval_metrics, "Recall", 50)
+    tail_recall_50 = retrieval_metric_value(retrieval_metrics, "Recall", 50, "tail")
+    mrr_10 = retrieval_metric_value(retrieval_metrics, "MRR", 10)
+    ndcg_10 = retrieval_metric_value(retrieval_metrics, "NDCG", 10)
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Users", f"{len(data['users']):,}", help="Unique users represented in the dashboard data.")
@@ -521,24 +568,34 @@ if page == "Overview":
         help=GLOSSARY["completion-weighted NDCG"],
     )
 
-    diag1, diag2, diag3 = st.columns(3)
+    diag1, diag2, diag3, diag4 = st.columns(4)
     diag1.metric(
-        "Binary NDCG@10",
-        f"{binary_metric:.3f}",
-        help="Standard NDCG using binary relevance instead of completion depth.",
+        "Recall@10",
+        f"{recall_10:.3f}" if pd.notna(recall_10) else "-",
+        help="Early retrieval quality. This is stricter and more useful than Recall@500.",
+    )
+    diag2.metric(
+        "Recall@50",
+        f"{recall_50:.3f}" if pd.notna(recall_50) else "-",
+        help=GLOSSARY["Recall@50"],
+    )
+    diag3.metric(
+        "Tail Recall@50",
+        f"{tail_recall_50:.3f}" if pd.notna(tail_recall_50) else "-",
+        help="Recall@50 for least-popular items. This is the main discovery weakness to improve.",
+    )
+    diag4.metric(
+        "MRR@10",
+        f"{mrr_10:.3f}" if pd.notna(mrr_10) else "-",
+        help=GLOSSARY["MRR@10"],
     )
     if pd.notna(data["overall_recall_500"]):
-        diag2.metric(
-            "Overall Recall@500",
-            f"{data['overall_recall_500']:.3f}",
-            help="Fraction of positive held-out items recovered in the top 500 candidates.",
+        st.caption(
+            f"Ceiling diagnostic only: oracle Recall@500 is {data['overall_recall_500']:.3f}. "
+            "With a small catalog, this number is inflated and should not be used as the headline score."
         )
-    if pd.notna(data["tail_recall_500"]):
-        diag3.metric(
-            "Tail Recall@500",
-            f"{data['tail_recall_500']:.3f}",
-            help="Recall@500 for the least-popular item quartile. This is the current weakness.",
-        )
+    if pd.notna(ndcg_10):
+        st.caption(f"Retrieval NDCG@10 at the selected/best epoch: {ndcg_10:.3f}.")
 
     st.subheader("How The System Works")
     flow_cols = st.columns(5)
@@ -684,6 +741,15 @@ elif page == "Ablation Study":
             marker_color="#0f766e",
         )
     )
+    if "Recall@50" in abl.columns:
+        fig.add_trace(
+            go.Bar(
+                name="Recall@50",
+                x=abl["Model"],
+                y=abl["Recall@50"],
+                marker_color="#ca8a04",
+            )
+        )
     fig.update_layout(
         barmode="group",
         height=460,
@@ -698,17 +764,22 @@ elif page == "Ablation Study":
         f"Metric note: {term('completion-weighted NDCG')} rewards recommendations that users read deeply.",
         unsafe_allow_html=True,
     )
+    formatters = {
+        "CW-NDCG@10": "{:.3f}",
+        "Binary-NDCG@10": "{:.3f}",
+    }
+    for col in ["Recall@10", "Recall@20", "Recall@50", "Recall@500"]:
+        if col in abl.columns:
+            formatters[col] = lambda x: f"{x:.3f}" if pd.notna(x) else "-"
     st.dataframe(
-        abl.style.format(
-            {
-                "CW-NDCG@10": "{:.3f}",
-                "Binary-NDCG@10": "{:.3f}",
-                "Recall@500": lambda x: f"{x:.3f}" if pd.notna(x) else "-",
-            }
-        ),
+        abl.style.format(formatters),
         use_container_width=True,
         hide_index=True,
     )
+    if "Recall@500" in abl.columns:
+        st.caption(
+            "Recall@500 is shown only as a ceiling diagnostic. On a 500-item catalog it is inflated because top-500 can include the whole catalog."
+        )
 
     delta = abl["CW-NDCG@10"].iloc[-1] - abl["CW-NDCG@10"].iloc[0]
     if delta < 0:

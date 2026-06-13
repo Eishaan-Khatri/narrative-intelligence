@@ -91,6 +91,7 @@ HARD_NEG_REFRESH_INTERVAL = 2  # refresh every N epochs during Phase 2
 HARD_NEG_CATALOG_SAMPLE = 5_000
 HARD_NEG_POOL_SIZE = 200
 HARD_NEG_SAMPLES_PER_POS = 5
+RETRIEVAL_METRICS_PATH = DATA_DIR / "retrieval_metrics.parquet"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -266,6 +267,7 @@ def hardneg_bpr_step(
     model: TwoTowerModel,
     batch: dict,
     optimizer: torch.optim.Optimizer,
+    loss_weight: float = 1.0,
 ) -> float:
     """One training step using pre-mined hard negatives.
 
@@ -286,7 +288,7 @@ def hardneg_bpr_step(
     user_emb, pos_emb = model(user_feat, pos_feat)
     neg_emb = model.item_tower(neg_feat)
 
-    loss = bpr_loss(user_emb, pos_emb, neg_emb, pos_pop, neg_pop)
+    loss = bpr_loss(user_emb, pos_emb, neg_emb, pos_pop, neg_pop) * loss_weight
 
     optimizer.zero_grad()
     loss.backward()
@@ -476,6 +478,110 @@ def compute_recall_at_k(
     return {k: v / n_val for k, v in hits.items()}
 
 
+@torch.no_grad()
+def compute_retrieval_metrics(
+    model: TwoTowerModel,
+    val_user_feats: np.ndarray,
+    val_item_ids: np.ndarray,
+    item_catalog_feats: np.ndarray,
+    item_popularity: np.ndarray,
+    k_values: Tuple[int, ...] = (10, 20, 50, 500),
+) -> pd.DataFrame:
+    """Compute retrieval metrics and popularity-split recall on validation data."""
+    model.eval()
+    n_val = val_user_feats.shape[0]
+    if n_val == 0:
+        return pd.DataFrame()
+
+    cat_tensor = torch.as_tensor(item_catalog_feats, dtype=torch.float32, device=device)
+    chunk_size = 2048
+    all_item_embs = []
+    for start in range(0, cat_tensor.shape[0], chunk_size):
+        chunk = cat_tensor[start:start + chunk_size]
+        all_item_embs.append(model.item_tower(chunk).cpu())
+    item_emb_matrix = torch.cat(all_item_embs, dim=0)
+
+    max_k = min(max(k_values), item_emb_matrix.shape[0])
+    ranks: list[int] = []
+    for start in range(0, n_val, chunk_size):
+        end = min(start + chunk_size, n_val)
+        u_tensor = torch.as_tensor(val_user_feats[start:end], dtype=torch.float32, device=device)
+        u_emb = model.user_tower(u_tensor).cpu()
+        scores = torch.mm(u_emb, item_emb_matrix.t())
+        _, topk_indices = torch.topk(scores, max_k, dim=-1)
+        topk_np = topk_indices.numpy()
+        true_items = val_item_ids[start:end]
+        for i, true_item in enumerate(true_items):
+            matches = np.where(topk_np[i] == true_item)[0]
+            ranks.append(int(matches[0]) + 1 if len(matches) else max_k + 1)
+
+    ranks_arr = np.asarray(ranks, dtype=np.int32)
+    true_pop = item_popularity[val_item_ids]
+    q1, q3 = np.quantile(true_pop, [0.25, 0.75])
+    buckets = np.full(n_val, "mid", dtype=object)
+    buckets[true_pop <= q1] = "tail"
+    buckets[true_pop >= q3] = "popular"
+
+    rows: list[dict] = []
+    for k in k_values:
+        k_eff = min(k, item_emb_matrix.shape[0])
+        hit_mask = ranks_arr <= k_eff
+        reciprocal = np.where(hit_mask, 1.0 / ranks_arr, 0.0)
+        ndcg = np.where(hit_mask, 1.0 / np.log2(ranks_arr + 1), 0.0)
+        rows.append({
+            "segment": "all",
+            "k": k,
+            "Recall": float(hit_mask.mean()),
+            "MRR": float(reciprocal.mean()) if k <= 10 else np.nan,
+            "NDCG": float(ndcg.mean()) if k <= 10 else np.nan,
+            "n": int(n_val),
+        })
+        for segment in ("tail", "mid", "popular"):
+            seg_mask = buckets == segment
+            if not seg_mask.any():
+                continue
+            seg_hits = hit_mask[seg_mask]
+            seg_ranks = ranks_arr[seg_mask]
+            seg_recip = np.where(seg_hits, 1.0 / seg_ranks, 0.0)
+            seg_ndcg = np.where(seg_hits, 1.0 / np.log2(seg_ranks + 1), 0.0)
+            rows.append({
+                "segment": segment,
+                "k": k,
+                "Recall": float(seg_hits.mean()),
+                "MRR": float(seg_recip.mean()) if k <= 10 else np.nan,
+                "NDCG": float(seg_ndcg.mean()) if k <= 10 else np.nan,
+                "n": int(seg_mask.sum()),
+            })
+
+    model.train()
+    return pd.DataFrame(rows)
+
+
+def build_item_popularity(item_ids: np.ndarray, n_items: int) -> np.ndarray:
+    """Return interaction-count popularity per item, with nonzero smoothing."""
+    counts = np.bincount(item_ids.astype(np.int64), minlength=n_items).astype(np.float32)
+    return counts + 1.0
+
+
+def oversample_tail_training_indices(
+    train_indices: np.ndarray,
+    item_ids: np.ndarray,
+    item_popularity: np.ndarray,
+    factor: int,
+) -> np.ndarray:
+    """Repeat tail-item positive samples to make tail positives less rare."""
+    if factor <= 1:
+        return train_indices
+    train_popularity = item_popularity[item_ids[train_indices]]
+    q1 = np.quantile(train_popularity, 0.25)
+    tail_mask = train_popularity <= q1
+    tail_indices = train_indices[tail_mask]
+    if len(tail_indices) == 0:
+        return train_indices
+    repeated_tail = np.repeat(tail_indices, factor - 1)
+    return np.concatenate([train_indices, repeated_tail])
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Plotting
 # ═══════════════════════════════════════════════════════════════════════════
@@ -593,6 +699,9 @@ def train(
     phase1_epochs: int = PHASE1_EPOCHS,
     batch_size: int = BATCH_SIZE,
     seed: int = 42,
+    phase1_only: bool = False,
+    hard_negative_weight: float = 1.0,
+    tail_oversample_factor: int = 1,
 ) -> TwoTowerModel:
     """Run the full two-phase training pipeline.
 
@@ -613,8 +722,12 @@ def train(
     print("Two-Tower Training Pipeline")
     print("=" * 70)
     print(f"  Users: {n_users}  |  Items: {n_items}  |  Interactions/user: {interactions_per_user}")
+    if phase1_only:
+        phase1_epochs = total_epochs
+
     print(f"  Epochs: {total_epochs} (Phase 1: {phase1_epochs}, Phase 2: {total_epochs - phase1_epochs})")
     print(f"  Batch size: {batch_size}  |  Device: {device}")
+    print(f"  Phase 1 only: {phase1_only}  |  Hard-neg weight: {hard_negative_weight:.2f}  |  Tail oversample: {tail_oversample_factor}x")
     print()
 
     # ---- Data ----
@@ -638,6 +751,13 @@ def train(
     n_val = max(1, int(n_total * val_fraction))
     n_val = min(n_val, n_total - 1)
     val_idx, train_idx = indices[:n_val], indices[n_val:]
+    item_popularity = build_item_popularity(item_ids, item_catalog.shape[0])
+    train_idx = oversample_tail_training_indices(
+        train_indices=train_idx,
+        item_ids=item_ids,
+        item_popularity=item_popularity,
+        factor=tail_oversample_factor,
+    )
 
     train_ds = RecommendationDataset(
         user_features=user_feats[train_idx],
@@ -663,6 +783,7 @@ def train(
     history_loss: List[float] = []
     history_r50: List[float] = []
     history_r500: List[float] = []
+    metrics_history: list[pd.DataFrame] = []
     best_r50 = -1.0
     best_state = None
 
@@ -693,7 +814,10 @@ def train(
         step_fn = hardneg_bpr_step if (phase == 2 and train_ds.has_hard_negatives) else inbatch_bpr_step
         desc = f"Epoch {epoch:2d}/{total_epochs} [Phase {phase}]"
         for batch in tqdm(train_loader, desc=desc, leave=False):
-            loss_val = step_fn(model, batch, optimizer)
+            if step_fn is hardneg_bpr_step:
+                loss_val = step_fn(model, batch, optimizer, hard_negative_weight)
+            else:
+                loss_val = step_fn(model, batch, optimizer)
             epoch_losses.append(loss_val)
 
         avg_loss = float(np.mean(epoch_losses)) if epoch_losses else 0.0
@@ -704,6 +828,17 @@ def train(
         )
         r50 = recalls[50]
         r500 = recalls[500]
+        epoch_metrics = compute_retrieval_metrics(
+            model,
+            val_user_feats,
+            val_item_ids,
+            item_catalog,
+            item_popularity,
+            k_values=(10, 20, 50, 500),
+        )
+        epoch_metrics.insert(0, "epoch", epoch)
+        epoch_metrics["phase"] = phase
+        metrics_history.append(epoch_metrics)
 
         history_loss.append(avg_loss)
         history_r50.append(r50)
@@ -729,6 +864,18 @@ def train(
     else:
         torch.save(model.state_dict(), str(model_path))
     print(f"\n[INFO] Best model (R@50={best_r50:.4f}) saved to {model_path}")
+
+    if metrics_history:
+        metrics_df = pd.concat(metrics_history, ignore_index=True)
+        metrics_df["is_best_r50_epoch"] = metrics_df["epoch"] == int(np.argmax(history_r50) + 1)
+        RETRIEVAL_METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        metrics_df.to_parquet(RETRIEVAL_METRICS_PATH, index=False)
+        best_rows = metrics_df[metrics_df["is_best_r50_epoch"] & metrics_df["segment"].eq("all")]
+        print(f"[INFO] Retrieval metrics saved to {RETRIEVAL_METRICS_PATH}")
+        if not best_rows.empty:
+            summary = best_rows[["k", "Recall", "MRR", "NDCG"]].to_string(index=False, float_format=lambda x: f"{x:.4f}")
+            print("[INFO] Best-epoch retrieval metrics:")
+            print(summary)
 
     # ---- Export embeddings ----
     # Deduplicate user features for export

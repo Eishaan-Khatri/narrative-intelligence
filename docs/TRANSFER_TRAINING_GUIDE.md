@@ -97,12 +97,29 @@ Full default training:
 python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024
 ```
 
+Recommended research comparison after the latest fixes:
+
+```powershell
+# 1. Baseline: no hard-negative phase, because the previous run degraded after epoch 5.
+python scripts/train_two_tower.py --epochs 5 --phase1-only --batch-size 1024
+
+# 2. Tuned Phase 2: lower hard-negative pressure and oversample tail positives.
+python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024 --hard-negative-weight 0.25 --tail-oversample-factor 3
+```
+
+Compare the two runs using `data/processed/retrieval_metrics.parquet`. Treat
+`Recall@10`, `Recall@20`, `Recall@50`, `MRR@10`, `NDCG@10`, and tail/mid/popular
+split rows as the real retrieval report. `Recall@500` is only a ceiling
+diagnostic because the current catalog can be small enough for top-500 to cover
+most or all items.
+
 Outputs are written to `data/processed/`:
 
 - `two_tower_model.pt`
 - `item_embeddings.parquet`
 - `user_embeddings.parquet`
 - `training_curves.png`
+- `retrieval_metrics.parquet`
 
 ## Current Limitations
 
@@ -116,3 +133,6 @@ Outputs are written to `data/processed/`:
   by the author embedding stage. It is sufficient for verifying the training
   path, but a serious training run should regenerate `session_features.parquet`
   from the full event log first.
+- The current retrieval catalog is still synthetic and small compared with the
+  original blueprint. For a stronger submission, regenerate with a larger
+  catalog and then rerun `python run_pipeline.py --from retrieval`.

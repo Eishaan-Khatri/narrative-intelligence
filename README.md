@@ -69,7 +69,8 @@ model, use the dedicated guide:
 ```bash
 python scripts/check_training_ready.py
 python scripts/train_two_tower.py --epochs 1 --phase1-epochs 1 --batch-size 512
-python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024
+python scripts/train_two_tower.py --epochs 5 --phase1-only --batch-size 1024
+python scripts/train_two_tower.py --epochs 15 --phase1-epochs 5 --batch-size 1024 --hard-negative-weight 0.25 --tail-oversample-factor 3
 ```
 
 Full instructions: `docs/TRANSFER_TRAINING_GUIDE.md`.
@@ -78,6 +79,10 @@ The two-tower trainer uses real processed artifacts when
 `data/processed/session_features.parquet` and
 `data/processed/item_fingerprints.parquet` exist. It falls back to synthetic
 toy data only when those artifacts are absent or invalid.
+
+The trainer now writes `data/processed/retrieval_metrics.parquet` with
+Recall@10, Recall@20, Recall@50, MRR@10, NDCG@10, and tail/mid/popular splits.
+Use Recall@500 only as a ceiling diagnostic on the current small catalog.
 
 ## Repository Structure
 

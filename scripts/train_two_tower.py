@@ -19,6 +19,23 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Train the two-tower retrieval model.")
     parser.add_argument("--epochs", type=int, default=15, help="Total training epochs.")
     parser.add_argument("--phase1-epochs", type=int, default=5, help="In-batch-negative epochs.")
+    parser.add_argument(
+        "--phase1-only",
+        action="store_true",
+        help="Disable hard-negative Phase 2 and train only with in-batch negatives.",
+    )
+    parser.add_argument(
+        "--hard-negative-weight",
+        type=float,
+        default=1.0,
+        help="Multiplier for Phase 2 hard-negative BPR loss.",
+    )
+    parser.add_argument(
+        "--tail-oversample-factor",
+        type=int,
+        default=1,
+        help="Repeat tail-item positive samples this many times during training.",
+    )
     parser.add_argument("--batch-size", type=int, default=1024, help="Training batch size.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
     parser.add_argument(
@@ -52,6 +69,9 @@ def main() -> int:
         phase1_epochs=args.phase1_epochs,
         batch_size=args.batch_size,
         seed=args.seed,
+        phase1_only=args.phase1_only,
+        hard_negative_weight=args.hard_negative_weight,
+        tail_oversample_factor=args.tail_oversample_factor,
     )
     return 0
 

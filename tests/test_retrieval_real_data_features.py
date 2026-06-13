@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from feature_store.schema import (
@@ -10,6 +11,10 @@ from feature_store.schema import (
 )
 from system_a_discovery_engine.layer2_retrieval.real_data_features import (
     build_real_training_arrays,
+)
+from system_a_discovery_engine.layer2_retrieval.train_loop import (
+    build_item_popularity,
+    oversample_tail_training_indices,
 )
 
 
@@ -109,6 +114,29 @@ class RetrievalRealDataFeatureTests(unittest.TestCase):
             self.assertEqual(log_popularity.shape, (2,))
             self.assertEqual(item_catalog_features.shape, (2, ITEM_TOWER_INPUT_DIM))
             self.assertEqual(item_ids.tolist(), [0, 1])
+
+    def test_tail_oversampling_repeats_low_popularity_positives(self):
+        item_ids = np.array([0, 0, 0, 1, 2, 3], dtype=np.int64)
+        train_indices = np.arange(len(item_ids), dtype=np.int64)
+        item_popularity = build_item_popularity(item_ids, n_items=4)
+
+        unchanged = oversample_tail_training_indices(
+            train_indices=train_indices,
+            item_ids=item_ids,
+            item_popularity=item_popularity,
+            factor=1,
+        )
+        oversampled = oversample_tail_training_indices(
+            train_indices=train_indices,
+            item_ids=item_ids,
+            item_popularity=item_popularity,
+            factor=3,
+        )
+
+        self.assertTrue(np.array_equal(unchanged, train_indices))
+        self.assertGreater(len(oversampled), len(train_indices))
+        repeated_item_ids = item_ids[oversampled[len(train_indices):]]
+        self.assertTrue(set(repeated_item_ids).issubset({1, 2, 3}))
 
 
 if __name__ == "__main__":
