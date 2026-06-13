@@ -40,7 +40,8 @@ st.markdown(
 
     .stApp {
         font-family: 'Inter', sans-serif;
-        background: #f6f7fb;
+        background: #f8fafc;
+        color: #111827;
     }
 
     .block-container {
@@ -49,11 +50,20 @@ st.markdown(
     }
 
     [data-testid="stSidebar"] {
-        background: #111827;
+        background: #ffffff;
+        border-right: 1px solid #e5e7eb;
     }
 
     [data-testid="stSidebar"] * {
-        color: #f9fafb;
+        color: #111827 !important;
+    }
+
+    [data-testid="stSidebar"] small {
+        color: #64748b !important;
+    }
+
+    h1, h2, h3, h4, h5, h6, p, li, label, .stMarkdown, .stText {
+        color: #111827;
     }
 
     .hero {
@@ -80,12 +90,12 @@ st.markdown(
     }
 
     .note-box {
-        background: #eef6ff;
-        border: 1px solid #bfdbfe;
+        background: #ffffff;
+        border: 1px solid #dbe3ef;
         border-radius: 8px;
-        padding: 14px 16px;
+        padding: 16px 18px;
         color: #1f2937;
-        margin: 12px 0 18px 0;
+        margin: 28px 0 6px 0;
     }
 
     .note-box strong {
@@ -104,7 +114,7 @@ st.markdown(
         visibility: hidden;
         width: 260px;
         background: #111827;
-        color: #ffffff;
+        color: #ffffff !important;
         text-align: left;
         border-radius: 6px;
         padding: 9px 10px;
@@ -144,6 +154,16 @@ st.markdown(
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         padding: 14px 16px;
+    }
+
+    div[data-testid="stMetric"] label,
+    div[data-testid="stMetric"] [data-testid="stMetricValue"],
+    div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+        color: #111827 !important;
+    }
+
+    .stAlert {
+        color: #111827;
     }
 </style>
 """,
@@ -393,14 +413,15 @@ def render_header(title: str, subtitle: str) -> None:
     )
 
 
-def render_project_note() -> None:
+def render_reviewer_note() -> None:
     st.markdown(
         f"""
         <div class="note-box">
-            <strong>Reviewer note:</strong> This dashboard demonstrates System A, the adaptive discovery engine.
-            It starts from raw reading events, builds a {term("feature store")}, trains {term("two-tower retrieval")},
-            indexes item vectors with {term("FAISS")}, applies a {term("survival model")} for dropout risk,
-            and reranks with {term("LambdaMART")}. Hover blue technical terms for definitions.
+            <strong>Reviewer note.</strong> System A is the recommendation layer of the project.
+            It converts raw reading events into a {term("feature store")}, retrieves candidates with
+            {term("two-tower retrieval")}, searches vectors through {term("FAISS")}, estimates dropout risk with
+            a {term("survival model")}, and reranks candidates with {term("LambdaMART")}. Hover any blue technical
+            term for a short definition.
         </div>
         """,
         unsafe_allow_html=True,
@@ -443,7 +464,6 @@ if page == "Overview":
         "System A - Discovery Engine",
         "A recommender prototype that scores stories by reading depth, quality, dropout risk, and fit to the reader.",
     )
-    render_project_note()
 
     abl = data["ablation"]
     metric_col = "CW-NDCG@10"
@@ -476,15 +496,7 @@ if page == "Overview":
             st.markdown(f"**{heading}**")
             st.caption(body)
 
-    st.subheader("What A Reviewer Should Notice")
-    st.markdown(
-        """
-        - This is a working System A prototype with generated artifacts, models, metrics, and a training handoff.
-        - The dashboard uses processed artifacts when present; otherwise it falls back to demo data.
-        - The main weakness is tail discovery: the system retrieves popular items better than long-tail items.
-        - System B is not part of this dashboard.
-        """
-    )
+    render_reviewer_note()
 
 
 elif page == "User Explorer":
@@ -492,7 +504,6 @@ elif page == "User Explorer":
         "User Explorer",
         "Inspect one reader's behavior profile and see the signals used by the recommendation engine.",
     )
-    render_project_note()
 
     selected_user = st.selectbox("Select user", data["users"]["user_id"].tolist())
     user_row = data["users"][data["users"]["user_id"] == selected_user].iloc[0]
@@ -535,6 +546,7 @@ elif page == "User Explorer":
         plot_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(fig, use_container_width=True)
+    render_reviewer_note()
 
 
 elif page == "Recommendations":
@@ -542,7 +554,6 @@ elif page == "Recommendations":
         "Recommendations",
         "View ranked story candidates and the contribution of each scoring signal.",
     )
-    render_project_note()
 
     selected_user = st.selectbox("Select user", data["users"]["user_id"].tolist(), key="rec_user")
     user_row = data["users"][data["users"]["user_id"] == selected_user].iloc[0]
@@ -588,6 +599,7 @@ elif page == "Recommendations":
                     plot_bgcolor="rgba(0,0,0,0)",
                 )
                 st.plotly_chart(fig, use_container_width=True)
+    render_reviewer_note()
 
 
 elif page == "Ablation Study":
@@ -595,7 +607,6 @@ elif page == "Ablation Study":
         "Ablation Study",
         "Shows whether each system layer improves ranking quality compared with the previous layer.",
     )
-    render_project_note()
 
     abl = data["ablation"].copy()
     fig = go.Figure()
@@ -646,6 +657,7 @@ elif page == "Ablation Study":
         f"Current full-pipeline delta over baseline: {delta:+.3f}. "
         "Treat this as prototype evidence, not a production benchmark."
     )
+    render_reviewer_note()
 
 
 elif page == "Survival Analysis":
@@ -653,7 +665,6 @@ elif page == "Survival Analysis":
         "Survival Analysis",
         "Visualizes estimated reader retention and dropout risk across chapters.",
     )
-    render_project_note()
 
     fig = go.Figure()
     colors = {"High quality": "#16a34a", "Medium quality": "#ca8a04", "Low quality": "#dc2626"}
@@ -707,3 +718,4 @@ elif page == "Survival Analysis":
         }
     )
     st.dataframe(hazard_data, use_container_width=True, hide_index=True)
+    render_reviewer_note()
