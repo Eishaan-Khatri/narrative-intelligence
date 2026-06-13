@@ -87,6 +87,16 @@ tail-oversampled, and tuned hard-negative variants in one session, stores each
 run under `data/processed/experiments/`, restores the best run to the canonical
 artifact paths, and then runs downstream FAISS/ranking/evaluation steps.
 
+For a full target-machine handoff, use:
+
+```bash
+python scripts/run_full_gpu_handoff.py --install-main --download-gutenberg --large-synthetic --run-training --batch-size 1024
+python scripts/final_artifact_report.py
+```
+
+If you have an Amazon metadata/review sample locally, pass it with
+`--amazon-input path/to/file.jsonl.gz` and add `--build-external-catalog`.
+
 ## Repository Structure
 
 ```

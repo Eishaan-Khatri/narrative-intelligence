@@ -54,6 +54,15 @@ python -m pip install -r requirements-optional.txt
 If `requirements-optional.txt` fails, the project still runs the survival layer
 with CoxPH only. Random Survival Forest comparison is skipped.
 
+You can run the project helper instead of installing optional packages by hand:
+
+```powershell
+python scripts/setup_optional_deps.py --install-main
+python scripts/setup_optional_deps.py --install-optional
+```
+
+If `scikit-survival` fails, continue. It is optional.
+
 For GPU training, install the PyTorch build that matches the target machine's
 CUDA version from the official PyTorch selector. Then verify CUDA:
 
@@ -147,6 +156,38 @@ python run_pipeline.py --from session_features
 
 This is slower than retrieval-only training. Use it only when you have enough
 time on the target machine to regenerate the upstream feature store.
+
+## One-Command GPU Handoff
+
+For the other system, the most direct command is:
+
+```powershell
+git pull
+python scripts/run_full_gpu_handoff.py --install-main --download-gutenberg --large-synthetic --run-training --batch-size 1024
+python scripts/final_artifact_report.py
+git add data/processed data/synthetic reports
+git commit -m "Update final System A artifacts"
+git push
+```
+
+If you also have an Amazon metadata/review file, add it:
+
+```powershell
+python scripts/run_full_gpu_handoff.py --download-gutenberg --amazon-input E:\path\to\amazon.jsonl.gz --build-external-catalog --large-synthetic --run-training --batch-size 1024
+```
+
+External catalogs are written to `data/raw/external/`. They are not activated
+for retrieval training by default because retrieval needs matching session
+events. To experiment with content-only Layer 1 topic modeling on Gutenberg and
+Amazon metadata, run:
+
+```powershell
+python scripts/build_external_catalog.py --activate
+python run_pipeline.py --step nmf_topics
+```
+
+Do not use `--activate` before a full retrieval training run unless you have
+also built matching interaction/session data for those external items.
 
 ## Current Limitations
 
