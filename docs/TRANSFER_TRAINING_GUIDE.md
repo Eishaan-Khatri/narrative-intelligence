@@ -103,15 +103,21 @@ python scripts/train_two_tower.py --epochs 1 --phase1-epochs 1 --batch-size 512
 Recommended final run if GPU access is limited and you want one serious pass:
 
 ```powershell
-python scripts/run_final_research_sweep.py --install-main --download-gutenberg --profile exhaustive --num-users 3000 --num-items 5000 --sessions-per-user 25 --batch-size 1024
+python scripts/run_final_research_sweep.py --install-main --download-gutenberg --gutenberg-large-list --gutenberg-limit 80 --profile super_extensive --num-users 4000 --num-items 8000 --sessions-per-user 30 --batch-size 1024
 python scripts/final_artifact_report.py
 ```
 
-This runs multiple calibrated simulator variants and multiple retrieval
+This runs the largest built-in sweep: multiple calibrated simulator variants and multiple retrieval
 training variants, writes a ranked comparison to
 `data/processed/final_sweep/final_research_sweep_summary.csv`, restores the best
 run to the canonical model paths, and writes
 `reports/system_a_final_research_sweep.md`.
+
+If you have Amazon data, add:
+
+```powershell
+--amazon-input E:\path\to\amazon.jsonl.gz --amazon-limit 50000 --build-external-catalog
+```
 
 Smaller fallback run:
 

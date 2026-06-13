@@ -50,6 +50,10 @@ ARTIFACTS = [
     "training_curves.png",
     "retrieval_metrics.parquet",
 ]
+LIGHT_ARTIFACTS = [
+    "training_curves.png",
+    "retrieval_metrics.parquet",
+]
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,22 @@ class TrainingVariant:
 
 
 DATASET_VARIANTS = [
+    DatasetVariant(
+        name="baseline_legacy_enriched",
+        rationale="Control run: original simulator pressure with richer catalog text. If this loses, the issue is behavioral calibration, not only content text.",
+        kwargs={
+            "exit_probability_multiplier": 1.0,
+            "transition_exit_multiplier": 1.0,
+            "speed_multiplier": 1.0,
+            "patience_multiplier": 1.0,
+            "valley_multiplier": 1.0,
+            "engaged_boost_multiplier": 1.0,
+            "quality_alpha": 2.0,
+            "quality_beta": 5.0,
+            "topic_concentration": 1.0,
+            "taste_concentration": 1.0,
+        },
+    ),
     DatasetVariant(
         name="calibrated_balanced",
         rationale="Lower transition exits and stronger engagement to fix the prior near-total abandonment problem.",
@@ -100,6 +120,54 @@ DATASET_VARIANTS = [
         },
     ),
     DatasetVariant(
+        name="app_like_balanced",
+        rationale="More app-like engagement distribution: less brittle exits, stronger taste clusters, and moderate completion signal.",
+        kwargs={
+            "exit_probability_multiplier": 0.35,
+            "transition_exit_multiplier": 0.25,
+            "speed_multiplier": 1.45,
+            "patience_multiplier": 1.60,
+            "valley_multiplier": 0.35,
+            "engaged_boost_multiplier": 1.35,
+            "quality_alpha": 2.6,
+            "quality_beta": 4.0,
+            "topic_concentration": 0.25,
+            "taste_concentration": 0.20,
+        },
+    ),
+    DatasetVariant(
+        name="diverse_taste_clusters",
+        rationale="Sharper taste clusters and richer topical separation to test whether personalization improves with more learnable structure.",
+        kwargs={
+            "exit_probability_multiplier": 0.40,
+            "transition_exit_multiplier": 0.30,
+            "speed_multiplier": 1.40,
+            "patience_multiplier": 1.50,
+            "valley_multiplier": 0.40,
+            "engaged_boost_multiplier": 1.35,
+            "quality_alpha": 2.4,
+            "quality_beta": 4.6,
+            "topic_concentration": 0.12,
+            "taste_concentration": 0.12,
+        },
+    ),
+    DatasetVariant(
+        name="tail_discovery_stress",
+        rationale="Harder tail-discovery setting with lower average quality and very sharp item niches.",
+        kwargs={
+            "exit_probability_multiplier": 0.50,
+            "transition_exit_multiplier": 0.38,
+            "speed_multiplier": 1.35,
+            "patience_multiplier": 1.45,
+            "valley_multiplier": 0.45,
+            "engaged_boost_multiplier": 1.30,
+            "quality_alpha": 1.8,
+            "quality_beta": 5.8,
+            "topic_concentration": 0.14,
+            "taste_concentration": 0.22,
+        },
+    ),
+    DatasetVariant(
         name="long_tail_harder",
         rationale="Keeps the task harder with sharper user/item taste clusters and stronger long-tail separation.",
         kwargs={
@@ -129,14 +197,39 @@ TRAINING_VARIANTS = [
         kwargs={"total_epochs": 10, "phase1_only": True, "learning_rate": 5e-4, "tail_oversample_factor": 3},
     ),
     TrainingVariant(
+        name="phase1_tail_lr7e4",
+        rationale="Middle learning-rate point between the old 1e-3 and previous best 5e-4.",
+        kwargs={"total_epochs": 10, "phase1_only": True, "learning_rate": 7e-4, "tail_oversample_factor": 3},
+    ),
+    TrainingVariant(
         name="phase1_tail_lr3e4",
         rationale="More conservative LR to test if ranking stability improves.",
         kwargs={"total_epochs": 14, "phase1_only": True, "learning_rate": 3e-4, "tail_oversample_factor": 4},
     ),
     TrainingVariant(
+        name="phase1_tail_lr2e4_long",
+        rationale="Longer conservative phase-1-only run for stable top-k ranking.",
+        kwargs={"total_epochs": 20, "phase1_only": True, "learning_rate": 2e-4, "tail_oversample_factor": 4},
+    ),
+    TrainingVariant(
+        name="phase1_tail_lr1e4_long",
+        rationale="Very conservative long run; tests whether prior models were under-optimized rather than structurally limited.",
+        kwargs={"total_epochs": 24, "phase1_only": True, "learning_rate": 1e-4, "tail_oversample_factor": 4},
+    ),
+    TrainingVariant(
         name="phase1_tail_strong_lr3e4",
         rationale="Stronger tail-positive oversampling for weak tail recall.",
         kwargs={"total_epochs": 14, "phase1_only": True, "learning_rate": 3e-4, "tail_oversample_factor": 6},
+    ),
+    TrainingVariant(
+        name="phase1_tail_extreme_lr2e4",
+        rationale="Extreme tail-positive oversampling; useful to prove when tail boosting starts hurting head relevance.",
+        kwargs={"total_epochs": 18, "phase1_only": True, "learning_rate": 2e-4, "tail_oversample_factor": 8},
+    ),
+    TrainingVariant(
+        name="phase1_tail_weightdecay_lr3e4",
+        rationale="Adds stronger regularization to reduce embedding overfit on sparse implicit labels.",
+        kwargs={"total_epochs": 16, "phase1_only": True, "learning_rate": 3e-4, "tail_oversample_factor": 5, "weight_decay": 5e-5},
     ),
     TrainingVariant(
         name="mild_hardneg_tail",
@@ -151,6 +244,18 @@ TRAINING_VARIANTS = [
         },
     ),
     TrainingVariant(
+        name="late_mild_hardneg_tail",
+        rationale="Delays hard negatives until the towers are stable, then applies very low hard-negative pressure.",
+        kwargs={
+            "total_epochs": 20,
+            "phase1_epochs": 12,
+            "learning_rate": 2e-4,
+            "hard_negative_weight": 0.03,
+            "tail_oversample_factor": 5,
+            "hard_negative_popularity_alpha": 1.00,
+        },
+    ),
+    TrainingVariant(
         name="pop_balanced_hardneg",
         rationale="Tests popularity-balanced hard-negative mining against phase-1-only training.",
         kwargs={
@@ -160,6 +265,18 @@ TRAINING_VARIANTS = [
             "hard_negative_weight": 0.05,
             "tail_oversample_factor": 5,
             "hard_negative_popularity_alpha": 1.00,
+        },
+    ),
+    TrainingVariant(
+        name="ultra_low_hardneg_tail",
+        rationale="Keeps hard-negative mining only as a weak ordering regularizer after tail oversampling.",
+        kwargs={
+            "total_epochs": 18,
+            "phase1_epochs": 10,
+            "learning_rate": 2e-4,
+            "hard_negative_weight": 0.02,
+            "tail_oversample_factor": 6,
+            "hard_negative_popularity_alpha": 1.25,
         },
     ),
 ]
@@ -176,7 +293,9 @@ def run_command(cmd: list[str], required: bool = True) -> int:
 def selected_dataset_variants(profile: str, names: list[str] | None) -> list[DatasetVariant]:
     variants = DATASET_VARIANTS
     if profile == "standard":
-        variants = DATASET_VARIANTS[:2]
+        variants = [variant for variant in DATASET_VARIANTS if variant.name in {"calibrated_balanced", "app_like_balanced"}]
+    elif profile == "exhaustive":
+        variants = [variant for variant in DATASET_VARIANTS if variant.name != "baseline_legacy_enriched"]
     if names:
         wanted = set(names)
         variants = [variant for variant in DATASET_VARIANTS if variant.name in wanted]
@@ -188,7 +307,35 @@ def selected_dataset_variants(profile: str, names: list[str] | None) -> list[Dat
 def selected_training_variants(profile: str, names: list[str] | None) -> list[TrainingVariant]:
     variants = TRAINING_VARIANTS
     if profile == "standard":
-        variants = TRAINING_VARIANTS[:4]
+        variants = [
+            variant
+            for variant in TRAINING_VARIANTS
+            if variant.name
+            in {
+                "phase1_lr1e3",
+                "phase1_tail_lr5e4",
+                "phase1_tail_lr3e4",
+                "phase1_tail_weightdecay_lr3e4",
+            }
+        ]
+    elif profile == "exhaustive":
+        variants = [
+            variant
+            for variant in TRAINING_VARIANTS
+            if variant.name
+            in {
+                "phase1_lr1e3",
+                "phase1_tail_lr5e4",
+                "phase1_tail_lr7e4",
+                "phase1_tail_lr3e4",
+                "phase1_tail_lr2e4_long",
+                "phase1_tail_strong_lr3e4",
+                "phase1_tail_weightdecay_lr3e4",
+                "mild_hardneg_tail",
+                "late_mild_hardneg_tail",
+                "ultra_low_hardneg_tail",
+            }
+        ]
     if names:
         wanted = set(names)
         variants = [variant for variant in TRAINING_VARIANTS if variant.name in wanted]
@@ -220,9 +367,10 @@ def summarize_sessions() -> dict[str, Any]:
     }
 
 
-def copy_current_artifacts(target_dir: Path) -> None:
+def copy_current_artifacts(target_dir: Path, full: bool = True) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
-    for artifact in ARTIFACTS:
+    artifacts = ARTIFACTS if full else LIGHT_ARTIFACTS
+    for artifact in artifacts:
         src = DATA_DIR / artifact
         if src.exists():
             shutil.copy2(src, target_dir / artifact)
@@ -274,6 +422,7 @@ def run_training_variant(
     training: TrainingVariant,
     batch_size: int,
     seed: int,
+    keep_all_artifacts: bool,
 ) -> dict[str, Any]:
     kwargs = {
         "batch_size": batch_size,
@@ -287,7 +436,7 @@ def run_training_variant(
     print("=" * 80)
     train(**kwargs)
     artifact_dir = SWEEP_DIR / dataset.name / training.name
-    copy_current_artifacts(artifact_dir)
+    copy_current_artifacts(artifact_dir, full=keep_all_artifacts)
     return summarize_training_result(dataset.name, training.name, artifact_dir)
 
 
@@ -302,10 +451,16 @@ def write_report(
     SWEEP_DIR.mkdir(parents=True, exist_ok=True)
     summary_path = SWEEP_DIR / "final_research_sweep_summary.csv"
     sessions_path = SWEEP_DIR / "final_research_sweep_session_calibration.csv"
+    best_dataset_path = SWEEP_DIR / "final_research_sweep_best_by_dataset.csv"
+    best_training_path = SWEEP_DIR / "final_research_sweep_best_by_training.csv"
     json_path = REPORT_DIR / "system_a_final_research_sweep.json"
     md_path = REPORT_DIR / "system_a_final_research_sweep.md"
     summary_df.to_csv(summary_path, index=False)
     session_df.to_csv(sessions_path, index=False)
+    best_by_dataset = summary_df.sort_values("selection_score", ascending=False).groupby("dataset_variant", as_index=False).head(1)
+    best_by_training = summary_df.sort_values("selection_score", ascending=False).groupby("training_variant", as_index=False).head(1)
+    best_by_dataset.to_csv(best_dataset_path, index=False)
+    best_by_training.to_csv(best_training_path, index=False)
 
     payload = {
         "best": best_row.to_dict(),
@@ -313,6 +468,8 @@ def write_report(
         "training_variants": [variant.__dict__ for variant in training_variants],
         "summary_csv": str(summary_path.relative_to(PROJECT_ROOT)),
         "session_calibration_csv": str(sessions_path.relative_to(PROJECT_ROOT)),
+        "best_by_dataset_csv": str(best_dataset_path.relative_to(PROJECT_ROOT)),
+        "best_by_training_csv": str(best_training_path.relative_to(PROJECT_ROOT)),
     }
     json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -333,7 +490,7 @@ def write_report(
         "## Scientific Interventions Tested",
         "- Simulator calibration: lower exit pressure, lower valley-of-death churn, higher patience, faster chapter progress.",
         "- Catalog/content enrichment: external Gutenberg/Amazon text when available, otherwise richer genre/topic descriptions.",
-        "- Retrieval variants: phase-1-only baselines, tail-positive oversampling, conservative learning rates, downweighted hard negatives, popularity-balanced hard negatives.",
+        "- Retrieval variants: phase-1-only baselines, tail-positive oversampling, conservative learning rates, weight decay, downweighted hard negatives, late hard negatives, popularity-balanced hard negatives.",
         "",
         "## Interpretation Rule",
         "If hard-negative variants lose to phase-1-only variants, report that hard negatives introduced false negatives/noisy pressure and were downweighted or disabled.",
@@ -342,11 +499,15 @@ def write_report(
         "## Output Files",
         f"- {summary_path.relative_to(PROJECT_ROOT)}",
         f"- {sessions_path.relative_to(PROJECT_ROOT)}",
+        f"- {best_dataset_path.relative_to(PROJECT_ROOT)}",
+        f"- {best_training_path.relative_to(PROJECT_ROOT)}",
         f"- {json_path.relative_to(PROJECT_ROOT)}",
     ]
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[OK] Wrote {summary_path}")
     print(f"[OK] Wrote {sessions_path}")
+    print(f"[OK] Wrote {best_dataset_path}")
+    print(f"[OK] Wrote {best_training_path}")
     print(f"[OK] Wrote {md_path}")
     print(f"[OK] Wrote {json_path}")
 
@@ -367,6 +528,8 @@ def run_external_preparation(args: argparse.Namespace) -> None:
             "--limit",
             str(args.gutenberg_limit),
         ]
+        if args.gutenberg_large_list:
+            gutenberg_cmd.append("--large-list")
         if args.gutenberg_ids:
             gutenberg_cmd.extend(["--ids", args.gutenberg_ids])
         run_command(gutenberg_cmd, required=False)
@@ -390,13 +553,14 @@ def run_external_preparation(args: argparse.Namespace) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the final System A research sweep.")
-    parser.add_argument("--profile", choices=["standard", "exhaustive"], default="exhaustive")
+    parser.add_argument("--profile", choices=["standard", "exhaustive", "super_extensive"], default="exhaustive")
     parser.add_argument("--dataset-variant", action="append")
     parser.add_argument("--training-variant", action="append")
     parser.add_argument("--install-main", action="store_true")
     parser.add_argument("--install-optional", action="store_true")
     parser.add_argument("--download-gutenberg", action="store_true")
     parser.add_argument("--gutenberg-limit", type=int, default=10)
+    parser.add_argument("--gutenberg-large-list", action="store_true", help="Use the larger curated Gutenberg ID list.")
     parser.add_argument("--gutenberg-ids", help="Comma-separated Project Gutenberg IDs for a larger curated text pull.")
     parser.add_argument("--amazon-input", type=Path)
     parser.add_argument("--amazon-limit", type=int, default=25000)
@@ -408,6 +572,7 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--external-mix-ratio", type=float, default=1.0)
+    parser.add_argument("--keep-all-run-artifacts", action="store_true", help="Store full model/embedding artifacts for every run. This can become very large.")
     parser.add_argument("--skip-downstream", action="store_true")
     args = parser.parse_args()
 
@@ -421,6 +586,8 @@ def main() -> int:
 
     result_rows: list[dict[str, Any]] = []
     session_rows: list[dict[str, Any]] = []
+    best_score = float("-inf")
+    best_artifact_dir = SWEEP_DIR / "_best_artifacts"
 
     for dataset in dataset_variants:
         print("\n" + "#" * 80)
@@ -459,17 +626,26 @@ def main() -> int:
         shutil.copy2(DATA_DIR / "session_features.parquet", dataset_dir / "session_features.parquet")
 
         for training in training_variants:
-            row = run_training_variant(dataset, training, args.batch_size, args.seed)
+            row = run_training_variant(
+                dataset,
+                training,
+                args.batch_size,
+                args.seed,
+                keep_all_artifacts=args.keep_all_run_artifacts,
+            )
             row.update(session_summary)
             row["dataset_rationale"] = dataset.rationale
             row["training_rationale"] = training.rationale
             result_rows.append(row)
+            if float(row["selection_score"]) > best_score:
+                best_score = float(row["selection_score"])
+                copy_current_artifacts(best_artifact_dir, full=True)
+                (best_artifact_dir / "best_run.json").write_text(json.dumps(row, indent=2), encoding="utf-8")
 
     summary_df = pd.DataFrame(result_rows).sort_values("selection_score", ascending=False).reset_index(drop=True)
     session_df = pd.DataFrame(session_rows)
     best_row = summary_df.iloc[0]
-    best_dir = SWEEP_DIR / str(best_row["dataset_variant"]) / str(best_row["training_variant"])
-    restore_artifacts(best_dir)
+    restore_artifacts(best_artifact_dir)
 
     write_report(summary_df, session_df, dataset_variants, training_variants, best_row)
 

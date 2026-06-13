@@ -18,16 +18,20 @@ main scientific fixes.
 
 ```powershell
 git pull
-python scripts/run_final_research_sweep.py --install-main --download-gutenberg --profile exhaustive --num-users 3000 --num-items 5000 --sessions-per-user 25 --batch-size 1024
+python scripts/run_final_research_sweep.py --install-main --download-gutenberg --gutenberg-large-list --gutenberg-limit 80 --profile super_extensive --num-users 4000 --num-items 8000 --sessions-per-user 30 --batch-size 1024
 python scripts/final_artifact_report.py
 ```
 
 ## With Amazon Data
 
 ```powershell
-python scripts/run_final_research_sweep.py --install-main --download-gutenberg --amazon-input E:\path\to\amazon.jsonl.gz --build-external-catalog --profile exhaustive --num-users 3000 --num-items 5000 --sessions-per-user 25 --batch-size 1024
+python scripts/run_final_research_sweep.py --install-main --download-gutenberg --gutenberg-large-list --gutenberg-limit 80 --amazon-input E:\path\to\amazon.jsonl.gz --amazon-limit 50000 --build-external-catalog --profile super_extensive --num-users 4000 --num-items 8000 --sessions-per-user 30 --batch-size 1024
 python scripts/final_artifact_report.py
 ```
+
+Amazon cannot be downloaded automatically by this repo. Put a local Amazon
+JSONL/JSONL.GZ/CSV/Parquet file on the GPU system and pass it through
+`--amazon-input`.
 
 ## Faster But Still Useful
 
@@ -39,6 +43,8 @@ python scripts/run_final_research_sweep.py --profile standard --num-users 2500 -
 
 - `data/processed/final_sweep/final_research_sweep_summary.csv`
 - `data/processed/final_sweep/final_research_sweep_session_calibration.csv`
+- `data/processed/final_sweep/final_research_sweep_best_by_dataset.csv`
+- `data/processed/final_sweep/final_research_sweep_best_by_training.csv`
 - `reports/system_a_final_research_sweep.md`
 - `reports/system_a_final_research_sweep.json`
 - `reports/system_a_final_artifact_report.md`

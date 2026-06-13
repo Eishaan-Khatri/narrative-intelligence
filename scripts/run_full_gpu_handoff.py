@@ -34,7 +34,8 @@ def main() -> int:
     parser.add_argument("--sessions-per-user", type=int, default=20)
     parser.add_argument("--run-training", action="store_true")
     parser.add_argument("--run-final-sweep", action="store_true", help="Run the exhaustive final research sweep instead of the older compact training suite.")
-    parser.add_argument("--sweep-profile", choices=["standard", "exhaustive"], default="exhaustive")
+    parser.add_argument("--sweep-profile", choices=["standard", "exhaustive", "super_extensive"], default="exhaustive")
+    parser.add_argument("--gutenberg-large-list", action="store_true")
     parser.add_argument("--batch-size", type=int, default=1024)
     parser.add_argument("--skip-downstream", action="store_true")
     args = parser.parse_args()
@@ -112,6 +113,8 @@ def main() -> int:
         if args.download_gutenberg:
             sweep_cmd.append("--download-gutenberg")
             sweep_cmd.extend(["--gutenberg-limit", str(args.gutenberg_limit)])
+            if args.gutenberg_large_list:
+                sweep_cmd.append("--gutenberg-large-list")
         if args.amazon_input is not None:
             sweep_cmd.extend(["--amazon-input", str(args.amazon_input)])
         if args.build_external_catalog:

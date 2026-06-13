@@ -34,6 +34,19 @@ DEFAULT_IDS = [
     5200,  # Metamorphosis
 ]
 
+LARGE_IDS = [
+    1342, 84, 11, 1661, 2701, 98, 74, 76, 1080, 5200,
+    345, 4300, 2600, 1400, 174, 2542, 1232, 2554, 2591, 205,
+    28054, 16328, 46, 768, 6130, 244, 514, 64317, 1184, 4363,
+    27827, 2814, 158, 161, 105, 120, 829, 730, 7370, 219,
+    408, 135, 36, 16, 35, 43, 45, 55, 1998, 996,
+    1497, 3207, 863, 1250, 521, 113, 5740, 1251, 600, 8800,
+    8805, 30254, 19942, 33283, 9966, 1727, 6133, 1399, 2800, 203,
+    43453, 5148, 209, 215, 37106, 236, 237, 2413, 2148, 25344,
+    10, 140, 730, 203, 2814, 766, 28885, 3296, 52881, 996,
+    14838, 2147, 3825, 3457, 376, 1064, 768, 42, 20203, 2434,
+]
+
 
 def fetch_text(gutenberg_id: int, timeout: int) -> str:
     urls = [
@@ -111,12 +124,15 @@ def build_record(gutenberg_id: int, text: str) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download Project Gutenberg sample texts.")
     parser.add_argument("--ids", default=",".join(str(i) for i in DEFAULT_IDS), help="Comma-separated Gutenberg IDs.")
+    parser.add_argument("--large-list", action="store_true", help="Use a larger curated Project Gutenberg ID list.")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--timeout", type=int, default=30)
     parser.add_argument("--sleep", type=float, default=0.2)
     args = parser.parse_args()
 
-    ids = [int(x.strip()) for x in args.ids.split(",") if x.strip()]
+    id_source = ",".join(str(i) for i in LARGE_IDS) if args.large_list else args.ids
+    ids = [int(x.strip()) for x in id_source.split(",") if x.strip()]
+    ids = list(dict.fromkeys(ids))
     if args.limit is not None:
         ids = ids[: args.limit]
 
