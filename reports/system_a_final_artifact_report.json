@@ -1,20 +1,20 @@
 {
-  "project_root": "D:\\Projects\\narrative-intelligence-platform",
+  "project_root": "E:\\Eishaan\\narrative-intelligence",
   "datasets": {
     "synthetic_catalog": {
       "exists": true,
-      "rows": 500,
+      "rows": 5000,
       "columns": 11
     },
     "synthetic_events": {
       "exists": true,
-      "rows": 1425071,
+      "rows": 2815365,
       "columns": 11
     },
     "gutenberg_catalog": {
-      "exists": false,
-      "rows": null,
-      "columns": null
+      "exists": true,
+      "rows": 10,
+      "columns": 21
     },
     "amazon_catalog": {
       "exists": false,
@@ -31,43 +31,43 @@
     {
       "name": "session_features.parquet",
       "exists": true,
-      "bytes": 3333274,
-      "rows": 60054,
+      "bytes": 6664030,
+      "rows": 119949,
       "columns": 15
     },
     {
       "name": "user_temporal_features.parquet",
       "exists": true,
-      "bytes": 60995,
-      "rows": 1000,
+      "bytes": 167761,
+      "rows": 3000,
       "columns": 5
     },
     {
       "name": "topic_vectors.parquet",
       "exists": true,
-      "bytes": 107039,
-      "rows": 500,
+      "bytes": 950988,
+      "rows": 5000,
       "columns": 41
     },
     {
       "name": "author_embeddings.parquet",
       "exists": true,
-      "bytes": 26504,
-      "rows": 98,
+      "bytes": 97806,
+      "rows": 995,
       "columns": 33
     },
     {
       "name": "quality_scores.parquet",
       "exists": true,
-      "bytes": 55856,
-      "rows": 500,
+      "bytes": 393620,
+      "rows": 5000,
       "columns": 14
     },
     {
       "name": "item_fingerprints.parquet",
       "exists": true,
-      "bytes": 163411,
-      "rows": 500,
+      "bytes": 1225042,
+      "rows": 5000,
       "columns": 82
     },
     {
@@ -80,44 +80,44 @@
     {
       "name": "item_embeddings.parquet",
       "exists": true,
-      "bytes": 400122,
-      "rows": 500,
+      "bytes": 3703565,
+      "rows": 5000,
       "columns": 129
     },
     {
       "name": "user_embeddings.parquet",
       "exists": true,
-      "bytes": 4365665,
-      "rows": 5910,
+      "bytes": 12929038,
+      "rows": 16937,
       "columns": 129
     },
     {
       "name": "retrieval_metrics.parquet",
-      "exists": false,
-      "bytes": 0,
-      "rows": null,
-      "columns": null
+      "exists": true,
+      "bytes": 7205,
+      "rows": 128,
+      "columns": 9
     },
     {
       "name": "faiss_index.bin",
       "exists": true,
-      "bytes": 195252,
+      "bytes": 303252,
       "rows": null,
       "columns": null
     },
     {
       "name": "lambdamart_model.txt",
       "exists": true,
-      "bytes": 697130,
+      "bytes": 693505,
       "rows": null,
       "columns": null
     },
     {
       "name": "ablation_results.parquet",
       "exists": true,
-      "bytes": 3814,
+      "bytes": 5569,
       "rows": 5,
-      "columns": 5
+      "columns": 8
     },
     {
       "name": "completion_ndcg_metrics.parquet",
@@ -129,13 +129,47 @@
     {
       "name": "oracle_analysis.parquet",
       "exists": true,
-      "bytes": 7283,
+      "bytes": 7299,
       "rows": 8,
       "columns": 11
     }
   ],
   "retrieval": {
-    "available": false
+    "available": true,
+    "Recall@10": 0.010449088483770564,
+    "Recall@20": 0.021009337483325924,
+    "Recall@50": 0.04474210760337928,
+    "Tail_Recall@50": 0.010644707772645109,
+    "MRR@10": 0.00316044344223535,
+    "NDCG@10": 0.004843632271891378
   },
-  "gpu_suite": []
+  "gpu_suite": [
+    {
+      "experiment": "phase1_tail_lr5e4",
+      "Recall@10": 0.0104490884837705,
+      "Recall@50": 0.0447421076033792,
+      "Tail_Recall@50": 0.0106447077726451,
+      "MRR@10": 0.0031604434422353,
+      "NDCG@10": 0.0048436322718913,
+      "selection_score": 0.0508545723502606
+    },
+    {
+      "experiment": "phase1_only_lr1e3",
+      "Recall@10": 0.01206091596265,
+      "Recall@50": 0.0426300578034682,
+      "Tail_Recall@50": 0.0038160273147218,
+      "MRR@10": 0.0041059915518008,
+      "NDCG@10": 0.0059315770932803,
+      "selection_score": 0.0455645693487793
+    },
+    {
+      "experiment": "tuned_hardneg_tail",
+      "Recall@10": 0.0101711871943085,
+      "Recall@50": 0.0417963539350822,
+      "Tail_Recall@50": 0.0052219321148825,
+      "MRR@10": 0.0032559444409155,
+      "NDCG@10": 0.0048377528876575,
+      "selection_score": 0.0452213061027523
+    }
+  ]
 }
