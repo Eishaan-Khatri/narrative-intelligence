@@ -1,28 +1,38 @@
-# System B - Content & Creator Opportunity Intelligence Lab
+# System B: Opportunity Lab
 
-System B is the platform-facing companion to System A. System A asks what a
-specific reader should see. System B asks which underexposed items and creators
-deserve exploration traffic, how much uncertainty remains, and whether a new
-policy can be evaluated safely before deployment.
+System B is the platform-side layer of the project.
 
-## Diagnosis
+System A asks:
 
-Pure engagement ranking creates exposure concentration. Popular creators keep
-getting data, underexposed creators remain uncertain, and promising niche items
-may never receive enough impressions to prove their quality. A naive "promote
-the highest early CTR" approach is also unsafe because tiny-sample items can
-look artificially strong.
+```text
+What should this reader see next?
+```
 
-System B addresses this with four controls:
+System B asks:
 
-- Bayesian shrinkage for low-data item quality.
-- Causal uplift scoring for whether extra exposure is likely to help.
-- Uncertainty-aware promotion with a relevance floor.
-- Offline policy evaluation using logged propensities.
+```text
+Which underexposed items should receive controlled exploration traffic?
+```
 
-## Pipeline
+It is not a production fairness system. It is an offline lab for testing ranking policies, uncertainty, exposure concentration, and off-policy evaluation.
 
-Run:
+## Why It Exists
+
+Popularity ranking gives more data to items that already have data. That makes the platform worse at finding good niche items and new creators.
+
+A naive fix is also risky. If an item has three impressions and two completions, its raw rate looks excellent, but the sample is too small to trust.
+
+System B handles that problem with:
+
+- Beta-Binomial shrinkage for low-sample item quality,
+- breakout forecasting from early signals,
+- uplift scoring for extra exposure,
+- promotion scoring with a relevance floor,
+- bandit policy comparison,
+- creator exposure concentration metrics,
+- IPS/SNIPS/doubly robust stress tests.
+
+## Run
 
 ```powershell
 python scripts/run_system_b_pipeline.py
@@ -30,80 +40,71 @@ python scripts/final_system_b_report.py
 streamlit run dashboards/system_b_demo/app.py
 ```
 
-Outputs are written under:
+Outputs:
 
 ```text
 data/processed/system_b/
 reports/system_b_final_report.md
 ```
 
-## Components
+## Main Files
 
-### Exposure Simulation
+```text
+exposure_simulation/
+  Builds the logged exposure table with propensities.
 
-`exposure_simulation/simulation_harness.py`
+bayesian_shrinkage/
+  Pulls tiny-sample quality rates toward a prior.
 
-Builds a synthetic exposure log from System A artifacts. Every row has known
-logging propensity, which is required for IPS and doubly robust evaluation.
+breakout_forecasting/
+  Predicts future upside from early-window item features.
 
-### Bayesian Shrinkage
+uplift_scoring/
+  Estimates whether extra exposure is expected to help.
 
-`bayesian_shrinkage/beta_binomial_shrinkage.py`
+uncertainty_promotion/
+  Combines quality, breakout, uplift, and uncertainty.
 
-Uses Beta-Binomial shrinkage so small-sample items regress toward their
-genre-level prior while mature items stay close to observed completion rate.
+bandit_exploration/
+  Compares popularity, epsilon-greedy, UCB1, and Thompson sampling.
 
-### Breakout Forecasting
+fairness/
+  Measures exposure concentration and relevance/fairness tradeoffs.
 
-`breakout_forecasting/`
+offline_eval/
+  Runs IPS, clipped IPS, SNIPS, and doubly robust estimates.
+```
 
-Builds item-level features and trains a LightGBM classifier when available,
-falling back to sklearn. Adds conformal-style uncertainty intervals around
-breakout scores.
+## Current Evidence
 
-### Uplift Scoring
+The current artifact run reports:
 
-`uplift_scoring/uplift_model.py`
+```text
+Items: 3000
+Logged exposures: 135000
+Breakout ROC-AUC: 0.6814
+Average precision: 0.2422
+Best reward among tested policies: epsilon_greedy
+```
 
-Uses a T-learner to estimate the incremental effect of exploration exposure on
-reward. This separates "good item" from "item likely to benefit from extra
-exposure."
+Read these artifacts first:
 
-### Uncertainty-Aware Promotion
+```text
+promotion_scores.parquet
+bandit_policy_metrics.parquet
+fairness_metrics.parquet
+ips_stress_test.parquet
+pareto_frontier.parquet
+```
 
-`uncertainty_promotion/promotion_policy.py`
+## Limitations
 
-Combines shrunk quality, breakout score, uplift score, and uncertainty while
-enforcing a minimum relevance floor.
+- Exposure data is simulated.
+- Uplift scores are not causal proof.
+- IPS requires known propensities and policy overlap.
+- Creator spam, safety, fatigue, and gaming are not modeled.
+- A real system would need logged traffic and randomized exploration buckets.
 
-### Bandit Exploration
+Safe framing:
 
-`bandit_exploration/`
-
-Compares popularity baseline, epsilon-greedy, UCB1, and Thompson Sampling using
-cumulative reward, regret, and exploration breadth.
-
-### Fairness Simulation
-
-`fairness/`
-
-Computes Gini, HHI, long-tail viability, and a relevance-vs-fairness Pareto
-frontier.
-
-### Offline Policy Evaluation
-
-`offline_eval/`
-
-Runs IPS, clipped IPS, self-normalized IPS, and doubly robust IPS. The stress
-test shows how estimates degrade when the target policy moves too far away from
-the logging policy.
-
-## Current Limitations
-
-- Exposure logs are simulated, not real production logs.
-- Amazon/Gutenberg content can enrich item metadata, but does not provide true
-  user exposure outcomes.
-- IPS is only valid when logging propensities are known and target-policy
-  overlap is sufficient.
-- Uplift estimates are simulation-backed; they should be treated as policy
-  design evidence, not live causal proof.
+> System B demonstrates how to evaluate exploration policy before deployment. It does not claim live platform impact.

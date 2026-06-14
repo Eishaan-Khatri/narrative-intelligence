@@ -36,135 +36,188 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+        --ink: #111827;
+        --muted: #5b6472;
+        --line: #d8dee8;
+        --panel: #ffffff;
+        --page: #f3f6f8;
+        --accent: #0f766e;
+        --accent-2: #1d4ed8;
+        --warn: #b45309;
+        --soft-accent: #e7f3f1;
+        --soft-blue: #e9f0fb;
+    }
 
     .stApp {
         font-family: 'Inter', sans-serif;
-        background: #f8fafc;
-        color: #111827;
+        background:
+            linear-gradient(180deg, #eef3f6 0, #f7f8fa 220px, #f7f8fa 100%);
+        color: var(--ink);
     }
 
     .block-container {
-        padding-top: 2rem;
-        max-width: 1220px;
+        padding-top: 1.35rem;
+        padding-bottom: 2.5rem;
+        max-width: 1240px;
     }
 
     [data-testid="stSidebar"] {
-        background: #ffffff;
-        border-right: 1px solid #e5e7eb;
+        background: #fbfcfd;
+        border-right: 1px solid var(--line);
     }
 
-    [data-testid="stSidebar"] * {
-        color: #111827 !important;
-    }
-
-    [data-testid="stSidebar"] small {
-        color: #64748b !important;
-    }
+    [data-testid="stSidebar"] * { color: var(--ink) !important; }
+    [data-testid="stSidebar"] small, [data-testid="stSidebar"] .stCaption { color: var(--muted) !important; }
 
     h1, h2, h3, h4, h5, h6, p, li, label, .stMarkdown, .stText {
-        color: #111827;
+        color: var(--ink);
+        letter-spacing: 0;
     }
 
+    h2, h3 { margin-top: 1.1rem; }
+
     .hero {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
+        background: var(--panel);
+        border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 22px 24px;
-        margin-bottom: 18px;
+        padding: 20px 22px;
+        margin-bottom: 14px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .hero-topline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: 8px;
     }
 
     .hero h1 {
-        color: #111827;
-        font-size: 2rem;
-        line-height: 1.15;
+        color: var(--ink);
+        font-size: 1.78rem;
+        line-height: 1.16;
         margin: 0 0 8px 0;
         letter-spacing: 0;
     }
 
     .hero p {
-        color: #4b5563;
-        font-size: 1rem;
+        color: var(--muted);
+        font-size: 0.98rem;
         margin: 0;
-        max-width: 900px;
+        max-width: 940px;
+    }
+
+    .status-strip {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 10px;
+        margin: 8px 0 16px 0;
+    }
+
+    .status-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 13px;
+    }
+
+    .status-card b {
+        display: block;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        color: #334155;
+        margin-bottom: 4px;
+    }
+
+    .status-card span {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.35;
     }
 
     .note-box {
-        background: #ffffff;
-        border: 1px solid #dbe3ef;
+        background: #fbfcfd;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--accent);
         border-radius: 8px;
-        padding: 16px 18px;
+        padding: 14px 16px;
         color: #1f2937;
-        margin: 28px 0 6px 0;
+        margin: 22px 0 6px 0;
     }
 
-    .note-box strong {
-        color: #0f172a;
-    }
+    .note-box strong { color: #0f172a; }
 
     .term {
-        border-bottom: 1px dotted #2563eb;
-        color: #1d4ed8;
+        border-bottom: 1px dotted var(--accent-2);
+        color: #1e40af;
         cursor: help;
         position: relative;
-        font-weight: 600;
+        font-weight: 700;
     }
 
     .term .tip {
         visibility: hidden;
-        width: 260px;
-        background: #111827;
+        width: 270px;
+        background: #172033;
         color: #ffffff !important;
         text-align: left;
-        border-radius: 6px;
+        border-radius: 7px;
         padding: 9px 10px;
         position: absolute;
         z-index: 50;
         bottom: 135%;
         left: 0;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
+        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.24);
         font-size: 0.82rem;
-        line-height: 1.35;
+        line-height: 1.38;
         font-weight: 400;
     }
 
-    .term:hover .tip {
-        visibility: visible;
-    }
+    .term:hover .tip { visibility: visible; }
 
     .pill {
         display: inline-flex;
         align-items: center;
         border-radius: 999px;
         padding: 4px 10px;
-        background: #e0f2fe;
-        color: #075985;
-        font-size: 0.82rem;
-        font-weight: 600;
+        background: var(--soft-accent);
+        color: #115e59;
+        font-size: 0.8rem;
+        font-weight: 700;
         margin-right: 6px;
+        border: 1px solid #b7d8d3;
     }
 
-    .small-muted {
-        color: #6b7280;
-        font-size: 0.9rem;
-    }
+    .small-muted { color: var(--muted); font-size: 0.9rem; }
 
     div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
+        background: var(--panel);
+        border: 1px solid var(--line);
         border-radius: 8px;
-        padding: 14px 16px;
+        padding: 12px 14px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
     }
 
-    div[data-testid="stMetric"] label,
-    div[data-testid="stMetric"] [data-testid="stMetricValue"],
-    div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
-        color: #111827 !important;
+    div[data-testid="stMetric"] label {
+        color: #475569 !important;
+        font-weight: 700;
     }
 
-    .stAlert {
-        color: #111827;
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #0f172a !important;
+        font-weight: 800;
     }
+
+    div[data-testid="stMetric"] [data-testid="stMetricDelta"] { color: #0f766e !important; }
+    .stAlert { color: var(--ink); }
+    div[data-testid="stDataFrame"] { border: 1px solid var(--line); border-radius: 8px; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -471,6 +524,7 @@ def render_header(title: str, subtitle: str) -> None:
     st.markdown(
         f"""
         <div class="hero">
+            <div class="hero-topline">System A / Reading recommender</div>
             <h1>{title}</h1>
             <p>{subtitle}</p>
         </div>
@@ -483,11 +537,25 @@ def render_reviewer_note() -> None:
     st.markdown(
         f"""
         <div class="note-box">
-            <strong>Reviewer note.</strong> System A is the recommendation layer of the project.
-            It converts raw reading events into a {term("feature store")}, retrieves candidates with
-            {term("two-tower retrieval")}, searches vectors through {term("FAISS")}, estimates dropout risk with
-            a {term("survival model")}, and reranks candidates with {term("LambdaMART")}. Hover any blue technical
-            term for a short definition.
+            <strong>Read this first.</strong> This is an offline recommender pipeline, not a production benchmark.
+            It turns reading events into a {term("feature store")}, retrieves candidates with
+            {term("two-tower retrieval")}, searches vectors with {term("FAISS")}, estimates dropout risk with
+            a {term("survival model")}, and reranks candidates with {term("LambdaMART")}. The pipeline is complete.
+            Retrieval quality is still modest, especially for tail items.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_status_strip() -> None:
+    st.markdown(
+        f"""
+        <div class="status-strip">
+            <div class="status-card"><b>Built</b><span>Feature store, retrieval, ranking, evaluation, dashboard, and final sweep artifacts.</span></div>
+            <div class="status-card"><b>Trust</b><span>{term("Recall@50")}, {term("MRR@10")}, tail recall, ablation tables, and saved reports.</span></div>
+            <div class="status-card"><b>Weak point</b><span>Tail retrieval is still weak. Hard negatives often made recall worse.</span></div>
+            <div class="status-card"><b>Do not claim</b><span>No live A/B test, no real user lift, no production recommender accuracy.</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -523,7 +591,7 @@ if session_features is not None and catalog_real is not None:
 
 with st.sidebar:
     st.markdown("## System A")
-    st.markdown("Adaptive Discovery & Personalization Engine")
+    st.markdown("Offline reading recommender")
     st.divider()
     page = st.radio(
         "Navigation",
@@ -538,9 +606,10 @@ with st.sidebar:
 
 if page == "Overview":
     render_header(
-        "System A - Discovery Engine",
-        "A recommender prototype that scores stories by reading depth, quality, dropout risk, and fit to the reader.",
+        "System A - Reading Recommender",
+        "Offline pipeline for turning reading behavior into candidate retrieval, ranking signals, and evaluation reports.",
     )
+    render_status_strip()
 
     ranking_metrics = data["ranking_metrics"]
     metric_row = ranking_metrics[ranking_metrics["k"] == 10]
@@ -592,19 +661,19 @@ if page == "Overview":
     if pd.notna(data["overall_recall_500"]):
         st.caption(
             f"Ceiling diagnostic only: oracle Recall@500 is {data['overall_recall_500']:.3f}. "
-            "With a small catalog, this number is inflated and should not be used as the headline score."
+            "With smaller catalogs, this number is inflated and should not be used as the headline score."
         )
     if pd.notna(ndcg_10):
         st.caption(f"Retrieval NDCG@10 at the selected/best epoch: {ndcg_10:.3f}.")
 
-    st.subheader("How The System Works")
+    st.subheader("Pipeline")
     flow_cols = st.columns(5)
     steps = [
-        ("1. Events", "Raw reads, exits, speed, completion, and device signals."),
-        ("2. Feature Store", "Reusable user, item, session, topic, and quality features."),
-        ("3. Retrieval", "Two-tower model finds candidate stories quickly."),
-        ("4. Risk + Rank", "Survival risk and LambdaMART reorder candidates."),
-        ("5. Evaluation", "CW-NDCG, ablation, and oracle analysis check behavior."),
+        ("1. Events", "Open, scroll, pause, exit, completion, and device signals."),
+        ("2. Feature Store", "Session, user, topic, author, and quality tables."),
+        ("3. Retrieval", "Two-tower model retrieves candidate stories."),
+        ("4. Risk + Rank", "Dropout risk and LambdaMART adjust candidate order."),
+        ("5. Evaluation", "Top-k metrics, ablation, and oracle analysis."),
     ]
     for col, (heading, body) in zip(flow_cols, steps):
         with col:
@@ -617,7 +686,7 @@ if page == "Overview":
 elif page == "User Explorer":
     render_header(
         "User Explorer",
-        "Inspect one reader's behavior profile and see the signals used by the recommendation engine.",
+        "Inspect one reader profile and the signals passed into retrieval and ranking.",
     )
 
     selected_user = st.selectbox("Select user", data["users"]["user_id"].tolist())
@@ -667,7 +736,7 @@ elif page == "User Explorer":
 elif page == "Recommendations":
     render_header(
         "Recommendations",
-        "View ranked story candidates and the contribution of each scoring signal.",
+        "Inspect candidate stories and the signals used in the final score.",
     )
 
     selected_user = st.selectbox("Select user", data["users"]["user_id"].tolist(), key="rec_user")
@@ -720,7 +789,7 @@ elif page == "Recommendations":
 elif page == "Ablation Study":
     render_header(
         "Ablation Study",
-        "Diagnostic comparison of offline scoring variants. It should reveal regressions as well as gains.",
+        "Offline comparison of scoring variants. Regressions are kept visible.",
     )
 
     abl = data["ablation"].copy()
@@ -785,12 +854,12 @@ elif page == "Ablation Study":
     if delta < 0:
         st.warning(
             f"Current ablation diagnostic is {delta:.3f} below baseline. "
-            "This means the latest reranking stack is not proven better by this artifact; treat it as a research signal, not a win."
+            "The reranking stack is not proven better here. Treat this as a useful failure, not a win."
         )
     else:
         st.info(
             f"Current ablation diagnostic is {delta:+.3f} over baseline. "
-            "Treat this as prototype evidence, not a production benchmark."
+            "Treat this as offline evidence, not a production benchmark."
         )
     render_reviewer_note()
 
@@ -798,7 +867,7 @@ elif page == "Ablation Study":
 elif page == "Survival Analysis":
     render_header(
         "Survival Analysis",
-        "Visualizes estimated reader retention and dropout risk across chapters.",
+        "Shows estimated reader retention and dropout risk across chapters.",
     )
 
     fig = go.Figure()

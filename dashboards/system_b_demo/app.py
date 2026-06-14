@@ -92,13 +92,13 @@ with st.sidebar:
         "View",
         ["Overview", "Opportunity Scout", "Bandit Policies", "Fairness", "IPS Stress Test"],
     )
-    st.caption("Content & Creator Opportunity Intelligence Lab")
+    st.caption("Opportunity and policy checks")
 
 st.markdown(
     """
 <div class="hero">
-  <h1>System B - Content & Creator Opportunity Lab</h1>
-  <p>Find underexposed content with measurable upside, compare exploration policies, and audit exposure concentration before simulated deployment.</p>
+  <h1>System B - Opportunity Lab</h1>
+  <p>Ranks underexposed items for controlled exploration and shows the policy risks before any live test.</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -115,7 +115,7 @@ if section == "Overview":
     c3.metric("Creators", f"{promotion['creator_id'].nunique():,}" if "creator_id" in promotion else "0")
     c4.metric("Top Promotion", f"{promotion['promotion_score'].max():.3f}")
 
-    st.subheader("Top Opportunity Items")
+    st.subheader("Top candidates")
     cols = [
         "item_id",
         "title",
@@ -135,7 +135,7 @@ if section == "Overview":
     st.markdown(
         """
 <div class="note">
-This dashboard uses simulated exposure logs with known propensities. It demonstrates policy design, uncertainty, and offline-evaluation mechanics; it is not live production traffic.
+This dashboard uses simulated exposure logs with known propensities. Read it as a policy test bench, not evidence of live production lift.
 </div>
 """,
         unsafe_allow_html=True,
@@ -155,7 +155,7 @@ elif section == "Opportunity Scout":
             size="posterior_uncertainty",
             color="primary_genre" if "primary_genre" in view.columns else None,
             hover_data=["item_id", "title", "creator_id"],
-            title="Quality vs Uplift, Sized by Uncertainty",
+            title="Quality vs uplift",
         ),
         use_container_width=True,
     )
@@ -166,11 +166,11 @@ elif section == "Bandit Policies":
         st.warning("No bandit policy metrics found.")
     else:
         st.plotly_chart(
-            px.line(bandit, x="round", y="cumulative_regret", color="policy", title="Cumulative Regret"),
+            px.line(bandit, x="round", y="cumulative_regret", color="policy", title="Cumulative regret"),
             use_container_width=True,
         )
         st.plotly_chart(
-            px.line(bandit, x="round", y="unique_items_exposed", color="policy", title="Exploration Breadth"),
+            px.line(bandit, x="round", y="unique_items_exposed", color="policy", title="Exploration breadth"),
             use_container_width=True,
         )
 
@@ -179,7 +179,7 @@ elif section == "Fairness":
         st.warning("No fairness artifacts found.")
     else:
         st.plotly_chart(
-            px.line(fairness, x="day", y="gini", color="policy", title="Creator Exposure Gini Over Time"),
+            px.line(fairness, x="day", y="gini", color="policy", title="Creator exposure concentration"),
             use_container_width=True,
         )
         st.plotly_chart(
@@ -189,7 +189,7 @@ elif section == "Fairness":
                 y="mean_relevance",
                 color="mean_novelty",
                 hover_data=["lambda_novelty", "lambda_fairness", "long_tail_viability"],
-                title="Pareto Frontier: Relevance vs Exposure Concentration",
+                title="Relevance vs exposure concentration",
             ),
             use_container_width=True,
         )
@@ -200,11 +200,11 @@ elif section == "IPS Stress Test":
         st.warning("No IPS stress-test artifact found.")
     else:
         st.plotly_chart(
-            px.bar(ips, x="target_policy", y=["ips", "snips", "clipped_ips_10", "doubly_robust"], barmode="group", title="Off-Policy Value Estimates"),
+            px.bar(ips, x="target_policy", y=["ips", "snips", "clipped_ips_10", "doubly_robust"], barmode="group", title="Off-policy value estimates"),
             use_container_width=True,
         )
         st.plotly_chart(
-            px.bar(ips, x="target_policy", y="effective_sample_size", title="Effective Sample Size by Policy Distance"),
+            px.bar(ips, x="target_policy", y="effective_sample_size", title="Effective sample size by policy distance"),
             use_container_width=True,
         )
         st.dataframe(ips, use_container_width=True)
