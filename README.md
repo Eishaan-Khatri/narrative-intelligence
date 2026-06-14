@@ -1,178 +1,182 @@
-# Narrative Intelligence Platform
+# Narrative Intelligence Platform - System A
 
-Two linked recommendation projects:
+System A is a reading recommender.
 
-- **System A**: a reading recommender that turns reading sessions into retrieval, ranking, and evaluation artifacts.
-- **System B**: a platform-side opportunity lab for deciding which underexposed items should receive measured exploration traffic.
+Think of a reading app. One story gets opened and closed after one chapter.
+Another story gets read slowly, bookmarked, and finished. A normal recommender
+may count both as a click. This project tries to tell the difference.
 
-The repo is intentionally honest about its limits. The behavior data is synthetic. Gutenberg text is used for content enrichment. Amazon can be added if a local dataset file is available. The project should be read as an end-to-end research and evaluation pipeline, not as a production recommender benchmark.
+It turns reading events into model features, trains a two-tower retrieval model,
+reranks candidates with reading-quality and dropout signals, and reports where
+the system works and where it still misses.
 
-## Current State
+Related project: System B is kept in a separate repository.
 
-System A has a complete pipeline:
+## What This Project Does
 
-1. simulate reading events,
-2. build session and temporal features,
-3. build item topics, author features, quality scores, and item fingerprints,
-4. train a two-tower retrieval model,
-5. build a FAISS index,
-6. run survival/reranking/evaluation,
-7. show the results in a Streamlit dashboard.
+- Rebuilds reading sessions from raw events.
+- Creates user, session, author, topic, and item features.
+- Scores content quality from completion, return, structure, and engagement signals.
+- Trains a two-tower retrieval model in PyTorch.
+- Builds a FAISS vector index for fast candidate search.
+- Adds dropout-risk and LambdaMART reranking signals.
+- Measures ranking quality with top-k metrics and ablation tables.
+- Shows the current artifacts in a Streamlit dashboard.
 
-System B has a separate policy layer:
+## The Main Idea
 
-1. build simulated exposure logs,
-2. shrink noisy item quality estimates,
-3. forecast breakout candidates,
-4. estimate uplift from exploration,
-5. compare bandit policies,
-6. measure exposure concentration,
-7. stress-test off-policy estimates.
+A click is weak evidence.
 
-## Latest System A Result
+If a reader opens a story, reads 3%, and leaves, that should not count the same
+as a story they finish. System A uses signals like reading speed, completion,
+return behavior, chapter progress, author history, and item quality to build a
+better recommendation pipeline.
 
-The final sweep ran 91 retrieval experiments over 8,000 items and about 239k sessions.
-
-Best run:
-
-```text
-Dataset variant: app_like_balanced
-Training variant: phase1_tail_strong_lr3e4
-Recall@10: 0.0057
-Recall@20: 0.0112
-Recall@50: 0.0268
-Tail Recall@50: 0.0118
-MRR@10: 0.0019
-NDCG@10: 0.0028
-```
-
-Interpretation:
-
-- Simulator calibration helped: the old baseline had about 10% mean completion; the selected app-like dataset has about 37%.
-- Tail-positive oversampling was more useful than aggressive hard-negative mining.
-- Hard negatives often reduced loss while hurting recall, which points to false-negative pressure in sparse implicit feedback.
-- Retrieval quality is still modest. Tail discovery remains the main weakness.
-
-Use these files for the final System A story:
+The project has five layers:
 
 ```text
-reports/system_a_final_research_sweep.md
-data/processed/final_sweep/final_research_sweep_summary.csv
-data/processed/final_sweep/final_research_sweep_best_by_dataset.csv
-data/processed/final_sweep/final_research_sweep_best_by_training.csv
+1. Event simulator
+   Creates open, scroll, pause, completion, and exit events.
+
+2. Feature store
+   Turns raw events into reusable tables for users, sessions, and items.
+
+3. Content features
+   Builds topics, author embeddings, quality scores, and item fingerprints.
+
+4. Retrieval
+   Uses a two-tower model to find likely candidate items quickly.
+
+5. Ranking and evaluation
+   Reranks candidates and checks Recall@10, Recall@50, MRR@10, NDCG@10,
+   tail recall, and ablation results.
 ```
 
-## Latest System B Result
+## Current Saved Result
 
-System B is stronger as a policy/evaluation artifact than as a live product claim.
-
-Current generated report:
+The current saved retrieval run uses a larger 8,000-item catalog. These are the
+main dashboard metrics from the saved artifacts:
 
 ```text
-reports/system_b_final_report.md
+Recall@10:       0.0057
+Recall@20:       0.0112
+Recall@50:       0.0268
+Tail Recall@50:  0.0118
+MRR@10:          0.0019
+NDCG@10:         0.0028
 ```
 
-Headline results:
+How to read this:
 
-```text
-Items: 3000
-Logged exposures: 135000
-Breakout ROC-AUC: 0.6814
-Average precision: 0.2422
-Best simulated bandit reward: epsilon_greedy
-```
+- Recall@50 means: out of the items a user later liked or finished, how many
+  showed up in the top 50 retrieved candidates.
+- Tail Recall@50 checks the same thing only for less popular items.
+- MRR@10 rewards the model when the first useful item appears near the top.
+- NDCG@10 rewards useful items more when they appear higher in the list.
 
-Interpretation:
+The result is not high yet. The useful part is that the project now measures the
+right failure: tail items are still hard to retrieve.
 
-- Bayesian shrinkage keeps low-sample items from dominating.
-- Uplift separates "good item" from "item worth exploring."
-- Bandit comparisons show the reward/discovery tradeoff.
-- IPS diagnostics show when offline estimates stop being trustworthy.
-- The exposure log is simulated, so none of this is live causal evidence.
+## What Improved During The Final Runs
 
-## Run The Dashboards
+- The catalog moved from a tiny setup to a larger 8,000-item setup.
+- Recall@500 stopped being the headline metric because it is too easy to inflate.
+- The training script now reports Recall@10, Recall@20, Recall@50, MRR@10,
+  NDCG@10, and tail/mid/popular splits.
+- Tail-positive oversampling worked better than heavy hard-negative mining.
+- Hard-negative mining often made the loss look better while recall got worse.
+
+That last point matters. A lower loss is not always a better recommender.
+
+## Run The Dashboard
 
 ```powershell
 streamlit run dashboards/system_a_demo/app.py
-streamlit run dashboards/system_b_demo/app.py
 ```
 
-## Rebuild System A
+The dashboard reads the current files under:
 
-For the final GPU sweep:
+```text
+data/processed/
+data/synthetic/
+```
+
+## Rebuild Or Train
+
+Basic readiness check:
+
+```powershell
+python scripts/check_training_ready.py
+```
+
+Train the two-tower model:
+
+```powershell
+python scripts/train_two_tower.py
+```
+
+Run the larger research sweep:
 
 ```powershell
 python scripts/run_final_research_sweep.py --install-main --download-gutenberg --gutenberg-large-list --gutenberg-limit 80 --profile super_extensive --num-users 4000 --num-items 8000 --sessions-per-user 30 --batch-size 1024
 python scripts/final_artifact_report.py
 ```
 
-If CUDA memory is tight, lower the batch size:
+Use `--batch-size 512` if CUDA memory is tight.
 
-```powershell
---batch-size 512
-```
-
-Do not commit `data/synthetic/events.parquet`. Full event logs can exceed GitHub limits and are intentionally ignored.
-
-## Rebuild System B
-
-```powershell
-python scripts/run_system_b_pipeline.py
-python scripts/final_system_b_report.py
-```
-
-## External Data
-
-Gutenberg:
-
-- downloaded by script,
-- used as text enrichment,
-- does not provide user-session labels.
-
-Amazon:
-
-- not downloaded automatically,
-- requires a local JSONL/CSV/Parquet file,
-- can enrich item metadata,
-- does not replace real logged behavior.
-
-Example:
-
-```powershell
-python scripts/run_final_research_sweep.py --amazon-input E:\path\to\amazon.jsonl.gz --amazon-limit 50000 --build-external-catalog
-```
-
-## Repository Map
+## Important Files
 
 ```text
 feature_store/
-  simulator and session/temporal feature builders
+  schema.py
+  build_session_features.py
+  build_temporal_features.py
+  simulator/markov_event_simulator.py
 
-system_a_discovery_engine/
-  content features, two-tower retrieval, FAISS, survival, reranking, evaluation
+system_a_discovery_engine/layer1_content/
+  nmf_topics.py
+  author_embeddings.py
+  quality_score_pca.py
 
-system_b_opportunity_lab/
-  shrinkage, breakout forecasting, uplift, bandits, fairness, IPS evaluation
+system_a_discovery_engine/layer2_retrieval/
+  two_tower_model.py
+  train_loop.py
+  faiss_index.py
 
-dashboards/
-  Streamlit dashboards for System A and System B
+system_a_discovery_engine/layer3_ranking/
+  survival_model.py
+  lambdamart_ranker.py
 
-scripts/
-  rebuild, training, reporting, and handoff scripts
+system_a_discovery_engine/layer4_evaluation/
+  completion_ndcg.py
+  ablation_runner.py
+  retrieval_oracle.py
 
-reports/
-  generated summaries from the latest artifacts
+dashboards/system_a_demo/app.py
+  Streamlit dashboard for the saved artifacts.
 ```
 
-## What Not To Claim
+## Data Notes
 
-Do not claim:
+The project mainly uses synthetic reading behavior. Gutenberg text is used for
+content enrichment. The important point is that user-session behavior is not
+real production traffic.
 
-- production recommendation quality,
-- real user lift,
-- real causal uplift,
-- mature long-tail retrieval performance.
+Do not commit the full synthetic event log:
 
-Safe claim:
+```text
+data/synthetic/events.parquet
+```
 
-> This is a complete offline recommendation and policy-evaluation pipeline. It exposes where the recommender works, where it fails, and which corrections were tested.
+It can exceed GitHub's file-size limit.
+
+## Limits
+
+- The behavior data is synthetic.
+- The model is not trained on live user traffic.
+- The current retrieval score is still modest.
+- Tail discovery is still the main weak point.
+- The dashboard is for project review, not production monitoring.
+
+The strongest next step is to train on real logged reading sessions with known
+impressions, completions, and returns.

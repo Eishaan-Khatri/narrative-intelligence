@@ -537,11 +537,11 @@ def render_reviewer_note() -> None:
     st.markdown(
         f"""
         <div class="note-box">
-            <strong>Read this first.</strong> This is an offline recommender pipeline, not a production benchmark.
-            It turns reading events into a {term("feature store")}, retrieves candidates with
+            <strong>What you are seeing.</strong> This page shows the saved recommender artifacts.
+            The system turns reading events into a {term("feature store")}, retrieves candidates with
             {term("two-tower retrieval")}, searches vectors with {term("FAISS")}, estimates dropout risk with
-            a {term("survival model")}, and reranks candidates with {term("LambdaMART")}. The pipeline is complete.
-            Retrieval quality is still modest, especially for tail items.
+            a {term("survival model")}, and reranks candidates with {term("LambdaMART")}.
+            Tail-item retrieval is still the main weak point.
         </div>
         """,
         unsafe_allow_html=True,
@@ -552,10 +552,10 @@ def render_status_strip() -> None:
     st.markdown(
         f"""
         <div class="status-strip">
-            <div class="status-card"><b>Built</b><span>Feature store, retrieval, ranking, evaluation, dashboard, and final sweep artifacts.</span></div>
-            <div class="status-card"><b>Trust</b><span>{term("Recall@50")}, {term("MRR@10")}, tail recall, ablation tables, and saved reports.</span></div>
+            <div class="status-card"><b>Built</b><span>Feature store, retrieval, ranking, evaluation, and dashboard.</span></div>
+            <div class="status-card"><b>Metrics</b><span>{term("Recall@50")}, {term("MRR@10")}, tail recall, ablation tables, and saved reports.</span></div>
             <div class="status-card"><b>Weak point</b><span>Tail retrieval is still weak. Hard negatives often made recall worse.</span></div>
-            <div class="status-card"><b>Do not claim</b><span>No live A/B test, no real user lift, no production recommender accuracy.</span></div>
+            <div class="status-card"><b>Limit</b><span>No live traffic test. The saved data is still synthetic behavior.</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -854,12 +854,12 @@ elif page == "Ablation Study":
     if delta < 0:
         st.warning(
             f"Current ablation diagnostic is {delta:.3f} below baseline. "
-            "The reranking stack is not proven better here. Treat this as a useful failure, not a win."
+            "This run is below baseline, so the reranker needs more work."
         )
     else:
         st.info(
             f"Current ablation diagnostic is {delta:+.3f} over baseline. "
-            "Treat this as offline evidence, not a production benchmark."
+            "This run is above baseline in the saved artifact set."
         )
     render_reviewer_note()
 
