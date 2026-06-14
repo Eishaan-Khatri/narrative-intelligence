@@ -3,17 +3,17 @@
   "datasets": {
     "synthetic_catalog": {
       "exists": true,
-      "rows": 5000,
-      "columns": 11
+      "rows": 8000,
+      "columns": 13
     },
     "synthetic_events": {
       "exists": true,
-      "rows": 2815365,
+      "rows": 8516636,
       "columns": 11
     },
     "gutenberg_catalog": {
       "exists": true,
-      "rows": 10,
+      "rows": 76,
       "columns": 21
     },
     "amazon_catalog": {
@@ -22,52 +22,52 @@
       "columns": null
     },
     "external_catalog_combined": {
-      "exists": false,
-      "rows": null,
-      "columns": null
+      "exists": true,
+      "rows": 76,
+      "columns": 21
     }
   },
   "artifacts": [
     {
       "name": "session_features.parquet",
       "exists": true,
-      "bytes": 6664030,
-      "rows": 119949,
+      "bytes": 13284581,
+      "rows": 239362,
       "columns": 15
     },
     {
       "name": "user_temporal_features.parquet",
       "exists": true,
-      "bytes": 167761,
-      "rows": 3000,
+      "bytes": 243764,
+      "rows": 4300,
       "columns": 5
     },
     {
       "name": "topic_vectors.parquet",
       "exists": true,
-      "bytes": 950988,
-      "rows": 5000,
+      "bytes": 1113272,
+      "rows": 8000,
       "columns": 41
     },
     {
       "name": "author_embeddings.parquet",
       "exists": true,
-      "bytes": 97806,
-      "rows": 995,
+      "bytes": 146528,
+      "rows": 1588,
       "columns": 33
     },
     {
       "name": "quality_scores.parquet",
       "exists": true,
-      "bytes": 393620,
-      "rows": 5000,
+      "bytes": 632463,
+      "rows": 8000,
       "columns": 14
     },
     {
       "name": "item_fingerprints.parquet",
       "exists": true,
-      "bytes": 1225042,
-      "rows": 5000,
+      "bytes": 1532224,
+      "rows": 8000,
       "columns": 82
     },
     {
@@ -80,28 +80,28 @@
     {
       "name": "item_embeddings.parquet",
       "exists": true,
-      "bytes": 3703565,
-      "rows": 5000,
+      "bytes": 5884354,
+      "rows": 8000,
       "columns": 129
     },
     {
       "name": "user_embeddings.parquet",
       "exists": true,
-      "bytes": 12929038,
-      "rows": 16937,
+      "bytes": 40184502,
+      "rows": 52159,
       "columns": 129
     },
     {
       "name": "retrieval_metrics.parquet",
       "exists": true,
-      "bytes": 7205,
-      "rows": 128,
+      "bytes": 8387,
+      "rows": 224,
       "columns": 9
     },
     {
       "name": "faiss_index.bin",
       "exists": true,
-      "bytes": 303252,
+      "bytes": 375252,
       "rows": null,
       "columns": null
     },
@@ -136,12 +136,12 @@
   ],
   "retrieval": {
     "available": true,
-    "Recall@10": 0.010449088483770564,
-    "Recall@20": 0.021009337483325924,
-    "Recall@50": 0.04474210760337928,
-    "Tail_Recall@50": 0.010644707772645109,
-    "MRR@10": 0.00316044344223535,
-    "NDCG@10": 0.004843632271891378
+    "Recall@10": 0.005727631652115887,
+    "Recall@20": 0.011177222932769838,
+    "Recall@50": 0.02683089584607685,
+    "Tail_Recall@50": 0.011848847139197267,
+    "MRR@10": 0.001916448427041765,
+    "NDCG@10": 0.0027900540928468788
   },
   "gpu_suite": [
     {

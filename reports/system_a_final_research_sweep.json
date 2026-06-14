@@ -1,0 +1,283 @@
+{
+  "best": {
+    "dataset_variant": "app_like_balanced",
+    "training_variant": "phase1_tail_strong_lr3e4",
+    "Recall@10": 0.005727631652115887,
+    "Recall@20": 0.011177222932769838,
+    "Recall@50": 0.02683089584607685,
+    "Tail_Recall@50": 0.011848847139197267,
+    "MRR@10": 0.001916448427041765,
+    "NDCG@10": 0.0027900540928468788,
+    "selection_score": 0.036894156830446966,
+    "sessions": 239778,
+    "users": 4000,
+    "items": 8000,
+    "mean_completion_pct": 0.3687905896287399,
+    "median_completion_pct": 0.26,
+    "chapter_end_rate": 0.119685709281085,
+    "mid_chapter_rate": 0.880314290718915,
+    "abandon_early_rate": 0.8102786744405241,
+    "steady_rate": 0.18970881398627062,
+    "dataset_rationale": "More app-like engagement distribution: less brittle exits, stronger taste clusters, and moderate completion signal.",
+    "training_rationale": "Stronger tail-positive oversampling for weak tail recall."
+  },
+  "dataset_variants": [
+    {
+      "name": "baseline_legacy_enriched",
+      "rationale": "Control run: original simulator pressure with richer catalog text. If this loses, the issue is behavioral calibration, not only content text.",
+      "kwargs": {
+        "exit_probability_multiplier": 1.0,
+        "transition_exit_multiplier": 1.0,
+        "speed_multiplier": 1.0,
+        "patience_multiplier": 1.0,
+        "valley_multiplier": 1.0,
+        "engaged_boost_multiplier": 1.0,
+        "quality_alpha": 2.0,
+        "quality_beta": 5.0,
+        "topic_concentration": 1.0,
+        "taste_concentration": 1.0
+      }
+    },
+    {
+      "name": "calibrated_balanced",
+      "rationale": "Lower transition exits and stronger engagement to fix the prior near-total abandonment problem.",
+      "kwargs": {
+        "exit_probability_multiplier": 0.45,
+        "transition_exit_multiplier": 0.35,
+        "speed_multiplier": 1.35,
+        "patience_multiplier": 1.4,
+        "valley_multiplier": 0.45,
+        "engaged_boost_multiplier": 1.2,
+        "quality_alpha": 2.8,
+        "quality_beta": 4.5,
+        "topic_concentration": 0.45,
+        "taste_concentration": 0.45
+      }
+    },
+    {
+      "name": "high_completion_stress",
+      "rationale": "Tests whether retrieval improves when labels contain many clear positive completions.",
+      "kwargs": {
+        "exit_probability_multiplier": 0.25,
+        "transition_exit_multiplier": 0.2,
+        "speed_multiplier": 1.55,
+        "patience_multiplier": 1.8,
+        "valley_multiplier": 0.25,
+        "engaged_boost_multiplier": 1.4,
+        "quality_alpha": 3.2,
+        "quality_beta": 3.8,
+        "topic_concentration": 0.35,
+        "taste_concentration": 0.35
+      }
+    },
+    {
+      "name": "app_like_balanced",
+      "rationale": "More app-like engagement distribution: less brittle exits, stronger taste clusters, and moderate completion signal.",
+      "kwargs": {
+        "exit_probability_multiplier": 0.35,
+        "transition_exit_multiplier": 0.25,
+        "speed_multiplier": 1.45,
+        "patience_multiplier": 1.6,
+        "valley_multiplier": 0.35,
+        "engaged_boost_multiplier": 1.35,
+        "quality_alpha": 2.6,
+        "quality_beta": 4.0,
+        "topic_concentration": 0.25,
+        "taste_concentration": 0.2
+      }
+    },
+    {
+      "name": "diverse_taste_clusters",
+      "rationale": "Sharper taste clusters and richer topical separation to test whether personalization improves with more learnable structure.",
+      "kwargs": {
+        "exit_probability_multiplier": 0.4,
+        "transition_exit_multiplier": 0.3,
+        "speed_multiplier": 1.4,
+        "patience_multiplier": 1.5,
+        "valley_multiplier": 0.4,
+        "engaged_boost_multiplier": 1.35,
+        "quality_alpha": 2.4,
+        "quality_beta": 4.6,
+        "topic_concentration": 0.12,
+        "taste_concentration": 0.12
+      }
+    },
+    {
+      "name": "tail_discovery_stress",
+      "rationale": "Harder tail-discovery setting with lower average quality and very sharp item niches.",
+      "kwargs": {
+        "exit_probability_multiplier": 0.5,
+        "transition_exit_multiplier": 0.38,
+        "speed_multiplier": 1.35,
+        "patience_multiplier": 1.45,
+        "valley_multiplier": 0.45,
+        "engaged_boost_multiplier": 1.3,
+        "quality_alpha": 1.8,
+        "quality_beta": 5.8,
+        "topic_concentration": 0.14,
+        "taste_concentration": 0.22
+      }
+    },
+    {
+      "name": "long_tail_harder",
+      "rationale": "Keeps the task harder with sharper user/item taste clusters and stronger long-tail separation.",
+      "kwargs": {
+        "exit_probability_multiplier": 0.55,
+        "transition_exit_multiplier": 0.45,
+        "speed_multiplier": 1.3,
+        "patience_multiplier": 1.35,
+        "valley_multiplier": 0.5,
+        "engaged_boost_multiplier": 1.25,
+        "quality_alpha": 2.2,
+        "quality_beta": 5.0,
+        "topic_concentration": 0.22,
+        "taste_concentration": 0.25
+      }
+    }
+  ],
+  "training_variants": [
+    {
+      "name": "phase1_lr1e3",
+      "rationale": "Original phase-1-only baseline; checks if hard negatives are still unnecessary.",
+      "kwargs": {
+        "total_epochs": 6,
+        "phase1_only": true,
+        "learning_rate": 0.001,
+        "tail_oversample_factor": 1
+      }
+    },
+    {
+      "name": "phase1_tail_lr5e4",
+      "rationale": "Previous best family: lower LR with tail-positive oversampling.",
+      "kwargs": {
+        "total_epochs": 10,
+        "phase1_only": true,
+        "learning_rate": 0.0005,
+        "tail_oversample_factor": 3
+      }
+    },
+    {
+      "name": "phase1_tail_lr7e4",
+      "rationale": "Middle learning-rate point between the old 1e-3 and previous best 5e-4.",
+      "kwargs": {
+        "total_epochs": 10,
+        "phase1_only": true,
+        "learning_rate": 0.0007,
+        "tail_oversample_factor": 3
+      }
+    },
+    {
+      "name": "phase1_tail_lr3e4",
+      "rationale": "More conservative LR to test if ranking stability improves.",
+      "kwargs": {
+        "total_epochs": 14,
+        "phase1_only": true,
+        "learning_rate": 0.0003,
+        "tail_oversample_factor": 4
+      }
+    },
+    {
+      "name": "phase1_tail_lr2e4_long",
+      "rationale": "Longer conservative phase-1-only run for stable top-k ranking.",
+      "kwargs": {
+        "total_epochs": 20,
+        "phase1_only": true,
+        "learning_rate": 0.0002,
+        "tail_oversample_factor": 4
+      }
+    },
+    {
+      "name": "phase1_tail_lr1e4_long",
+      "rationale": "Very conservative long run; tests whether prior models were under-optimized rather than structurally limited.",
+      "kwargs": {
+        "total_epochs": 24,
+        "phase1_only": true,
+        "learning_rate": 0.0001,
+        "tail_oversample_factor": 4
+      }
+    },
+    {
+      "name": "phase1_tail_strong_lr3e4",
+      "rationale": "Stronger tail-positive oversampling for weak tail recall.",
+      "kwargs": {
+        "total_epochs": 14,
+        "phase1_only": true,
+        "learning_rate": 0.0003,
+        "tail_oversample_factor": 6
+      }
+    },
+    {
+      "name": "phase1_tail_extreme_lr2e4",
+      "rationale": "Extreme tail-positive oversampling; useful to prove when tail boosting starts hurting head relevance.",
+      "kwargs": {
+        "total_epochs": 18,
+        "phase1_only": true,
+        "learning_rate": 0.0002,
+        "tail_oversample_factor": 8
+      }
+    },
+    {
+      "name": "phase1_tail_weightdecay_lr3e4",
+      "rationale": "Adds stronger regularization to reduce embedding overfit on sparse implicit labels.",
+      "kwargs": {
+        "total_epochs": 16,
+        "phase1_only": true,
+        "learning_rate": 0.0003,
+        "tail_oversample_factor": 5,
+        "weight_decay": 5e-05
+      }
+    },
+    {
+      "name": "mild_hardneg_tail",
+      "rationale": "Tests whether hard negatives work only when their loss is heavily downweighted.",
+      "kwargs": {
+        "total_epochs": 14,
+        "phase1_epochs": 6,
+        "learning_rate": 0.0003,
+        "hard_negative_weight": 0.1,
+        "tail_oversample_factor": 4,
+        "hard_negative_popularity_alpha": 0.75
+      }
+    },
+    {
+      "name": "late_mild_hardneg_tail",
+      "rationale": "Delays hard negatives until the towers are stable, then applies very low hard-negative pressure.",
+      "kwargs": {
+        "total_epochs": 20,
+        "phase1_epochs": 12,
+        "learning_rate": 0.0002,
+        "hard_negative_weight": 0.03,
+        "tail_oversample_factor": 5,
+        "hard_negative_popularity_alpha": 1.0
+      }
+    },
+    {
+      "name": "pop_balanced_hardneg",
+      "rationale": "Tests popularity-balanced hard-negative mining against phase-1-only training.",
+      "kwargs": {
+        "total_epochs": 16,
+        "phase1_epochs": 8,
+        "learning_rate": 0.0002,
+        "hard_negative_weight": 0.05,
+        "tail_oversample_factor": 5,
+        "hard_negative_popularity_alpha": 1.0
+      }
+    },
+    {
+      "name": "ultra_low_hardneg_tail",
+      "rationale": "Keeps hard-negative mining only as a weak ordering regularizer after tail oversampling.",
+      "kwargs": {
+        "total_epochs": 18,
+        "phase1_epochs": 10,
+        "learning_rate": 0.0002,
+        "hard_negative_weight": 0.02,
+        "tail_oversample_factor": 6,
+        "hard_negative_popularity_alpha": 1.25
+      }
+    }
+  ],
+  "summary_csv": "data\\processed\\final_sweep\\final_research_sweep_summary.csv",
+  "session_calibration_csv": "data\\processed\\final_sweep\\final_research_sweep_session_calibration.csv",
+  "best_by_dataset_csv": "data\\processed\\final_sweep\\final_research_sweep_best_by_dataset.csv",
+  "best_by_training_csv": "data\\processed\\final_sweep\\final_research_sweep_best_by_training.csv"
+}

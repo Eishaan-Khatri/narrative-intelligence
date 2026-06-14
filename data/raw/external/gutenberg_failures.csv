@@ -1,0 +1,5 @@
+gutenberg_id,error
+28054,"IncompleteRead(1917565 bytes read, 64641 more expected)"
+1184,"IncompleteRead(2756201 bytes read, 11151 more expected)"
+5740,https://www.gutenberg.org/files/5740/5740-0.txt: HTTP Error 404: Not Found; https://www.gutenberg.org/files/5740/5740.txt: HTTP Error 404: Not Found
+33283,https://www.gutenberg.org/files/33283/33283-0.txt: HTTP Error 404: Not Found; https://www.gutenberg.org/files/33283/33283.txt: HTTP Error 404: Not Found

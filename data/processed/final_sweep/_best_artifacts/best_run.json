@@ -1,0 +1,22 @@
+{
+  "dataset_variant": "app_like_balanced",
+  "training_variant": "phase1_tail_strong_lr3e4",
+  "Recall@10": 0.005727631652115887,
+  "Recall@20": 0.011177222932769838,
+  "Recall@50": 0.02683089584607685,
+  "Tail_Recall@50": 0.011848847139197267,
+  "MRR@10": 0.001916448427041765,
+  "NDCG@10": 0.0027900540928468788,
+  "selection_score": 0.036894156830446966,
+  "sessions": 239778,
+  "users": 4000,
+  "items": 8000,
+  "mean_completion_pct": 0.3687905896287399,
+  "median_completion_pct": 0.26,
+  "chapter_end_rate": 0.119685709281085,
+  "mid_chapter_rate": 0.880314290718915,
+  "abandon_early_rate": 0.8102786744405241,
+  "steady_rate": 0.18970881398627062,
+  "dataset_rationale": "More app-like engagement distribution: less brittle exits, stronger taste clusters, and moderate completion signal.",
+  "training_rationale": "Stronger tail-positive oversampling for weak tail recall."
+}
