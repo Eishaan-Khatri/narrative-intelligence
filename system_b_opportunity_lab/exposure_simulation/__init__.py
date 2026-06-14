@@ -1,0 +1,1 @@
+"""Synthetic exposure log simulation."""

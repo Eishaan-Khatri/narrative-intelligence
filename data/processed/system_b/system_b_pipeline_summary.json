@@ -1,0 +1,127 @@
+{
+  "n_items": 3000,
+  "n_exposures": 135000,
+  "breakout_metrics": {
+    "model": "lightgbm",
+    "roc_auc": 0.6814156283465638,
+    "average_precision": 0.242213537641432,
+    "positive_rate": 0.11866666666666667,
+    "n_items": 3000,
+    "n_features": 58
+  },
+  "top_opportunity_items": [
+    {
+      "item_id": "item_01938",
+      "title": "Book 01938",
+      "creator_id": "author_0790",
+      "primary_genre": "Poetry",
+      "promotion_score": 0.3906912723484815,
+      "shrunk_mean": 0.171610258126595,
+      "breakout_score": 0.9078573057478996,
+      "uplift_score": 0.29081060901265876
+    },
+    {
+      "item_id": "item_04596",
+      "title": "Book 04596",
+      "creator_id": "author_0061",
+      "primary_genre": "Mystery",
+      "promotion_score": 0.3804783873105142,
+      "shrunk_mean": 0.15681116900197278,
+      "breakout_score": 0.9368024768829541,
+      "uplift_score": 0.2619289415833253
+    },
+    {
+      "item_id": "item_00072",
+      "title": "Book 00072",
+      "creator_id": "author_0208",
+      "primary_genre": "Historical Fiction",
+      "promotion_score": 0.3753981203802175,
+      "shrunk_mean": 0.19378354562204597,
+      "breakout_score": 0.9340839535564086,
+      "uplift_score": 0.19778472658335983
+    },
+    {
+      "item_id": "item_03620",
+      "title": "Book 03620",
+      "creator_id": "author_0166",
+      "primary_genre": "Science Fiction",
+      "promotion_score": 0.3709775054107823,
+      "shrunk_mean": 0.1567331064657268,
+      "breakout_score": 0.9455113255230688,
+      "uplift_score": 0.2222773192998698
+    },
+    {
+      "item_id": "item_00453",
+      "title": "Book 00453",
+      "creator_id": "author_0056",
+      "primary_genre": "Dystopian",
+      "promotion_score": 0.3692838502799292,
+      "shrunk_mean": 0.1842347677325964,
+      "breakout_score": 0.8732668838244533,
+      "uplift_score": 0.2138853770566011
+    },
+    {
+      "item_id": "item_04140",
+      "title": "Book 04140",
+      "creator_id": "author_0748",
+      "primary_genre": "Literary Fiction",
+      "promotion_score": 0.36896438592708575,
+      "shrunk_mean": 0.1447596988998263,
+      "breakout_score": 0.8751292970040716,
+      "uplift_score": 0.25811518906493314
+    },
+    {
+      "item_id": "item_00356",
+      "title": "Book 00356",
+      "creator_id": "author_0626",
+      "primary_genre": "Horror",
+      "promotion_score": 0.3660147462962169,
+      "shrunk_mean": 0.222524800622447,
+      "breakout_score": 0.9358614743107656,
+      "uplift_score": 0.1254062200960047
+    },
+    {
+      "item_id": "item_01636",
+      "title": "Book 01636",
+      "creator_id": "author_0856",
+      "primary_genre": "Romance",
+      "promotion_score": 0.36564945895129075,
+      "shrunk_mean": 0.1552403467297084,
+      "breakout_score": 0.9359217100237966,
+      "uplift_score": 0.20467436824498003
+    },
+    {
+      "item_id": "item_04904",
+      "title": "Book 04904",
+      "creator_id": "author_0935",
+      "primary_genre": "Dystopian",
+      "promotion_score": 0.35406313325915145,
+      "shrunk_mean": 0.16778523489932887,
+      "breakout_score": 0.8220105655644072,
+      "uplift_score": 0.2239982666334572
+    },
+    {
+      "item_id": "item_02566",
+      "title": "Book 02566",
+      "creator_id": "author_0578",
+      "primary_genre": "Poetry",
+      "promotion_score": 0.3533541696655507,
+      "shrunk_mean": 0.1595674329949041,
+      "breakout_score": 0.8921628337050655,
+      "uplift_score": 0.1608715064037055
+    }
+  ],
+  "outputs": {
+    "item_universe": "data\\processed\\system_b\\item_universe.parquet",
+    "exposure_log": "data\\processed\\system_b\\exposure_log.parquet",
+    "item_features": "data\\processed\\system_b\\item_features.parquet",
+    "shrunk_quality": "data\\processed\\system_b\\shrunk_quality.parquet",
+    "breakout_predictions": "data\\processed\\system_b\\breakout_predictions.parquet",
+    "uplift_scores": "data\\processed\\system_b\\uplift_scores.parquet",
+    "promotion_scores": "data\\processed\\system_b\\promotion_scores.parquet",
+    "bandit_policy_metrics": "data\\processed\\system_b\\bandit_policy_metrics.parquet",
+    "fairness_metrics": "data\\processed\\system_b\\fairness_metrics.parquet",
+    "pareto_frontier": "data\\processed\\system_b\\pareto_frontier.parquet",
+    "ips_stress_test": "data\\processed\\system_b\\ips_stress_test.parquet"
+  }
+}
